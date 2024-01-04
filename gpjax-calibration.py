@@ -13,10 +13,7 @@ import numpyro.distributions as dist
 from numpyro.infer import MCMC
 
 import gpjax as gpx
-# from kohgpjax.kohdataset import KOHDataset
 from kohgpjax.kohkernel import KOHKernel
-# from kohgpjax.objectives import KOHDataset
-# from kohgpjax.gps import Prior as KOHPrior
 
 import matplotlib.pyplot as plt
 
