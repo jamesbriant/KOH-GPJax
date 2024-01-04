@@ -8,14 +8,8 @@ import jax.numpy as jnp
 from jax import random
 from jax import jit
 
-import numpyro
-import numpyro.distributions as dist
-from numpyro.infer import MCMC
-
 import gpjax as gpx
 from kohgpjax.kohkernel import KOHKernel
-
-import matplotlib.pyplot as plt
 
 key = random.PRNGKey(123)
 
@@ -58,8 +52,8 @@ theta = 0.5
 
 x = jnp.vstack((xf_normalized, xc_normalized))
 t = jnp.vstack((jnp.zeros((xf_normalized.shape[0], tc_normalized.shape[1])) + theta, tc_normalized))
-x = jnp.hstack((x, t))
-y = jnp.vstack((yf_standardized, yc_standardized))
+x = jnp.hstack((x, t), dtype=np.float64)
+y = jnp.vstack((yf_standardized, yc_standardized), dtype=np.float64)
 
 data = gpx.Dataset(X=x, y=y)
 
@@ -144,6 +138,7 @@ likelihood = gpx.likelihoods.Gaussian(
 
 posterior = prior * likelihood
 
-negative_mll = gpx.objectives.ConjugateMLL(negative=True)
+negative_mll = jit(gpx.objectives.ConjugateMLL(negative=True))
 nll = negative_mll(posterior, train_data=data)
+
 print(nll - 0.5*data.n*jnp.log(2*jnp.pi))
