@@ -19,6 +19,7 @@ from beartype.typing import (
 )
 from jax import vmap
 from jax.scipy.linalg import block_diag
+from jax.numpy import pad
 from jaxtyping import (
     Float,
     Num,
@@ -26,13 +27,6 @@ from jaxtyping import (
 
 from gpjax.kernels.computations.base import AbstractKernelComputation
 from gpjax.typing import Array
-
-# from cola import PSD
-# from cola.ops import (
-#     Dense,
-#     Diagonal,
-#     LinearOperator,
-# )
 
 # from kohgpjax.kohkernel import KOHKernel
 
@@ -51,11 +45,14 @@ class KOHKernelComputation(AbstractKernelComputation):
         y: Float[Array, "M D"],
     ) -> Tuple[Array, ...]:
         # PART 1 - Extract the field observations and simulation outputs
-        x_field = x[:kernel.num_obs, ...]
-        y_field = y[:kernel.num_obs, ...]
+        a = kernel.num_field_obs
+        b = kernel.num_sim_obs
 
-        x_sim = x[kernel.num_obs:, ...]
-        y_sim = y[kernel.num_obs:, ...]
+        x_field = x[:a, ...]
+        y_field = y[:a, ...]
+
+        x_sim = x[a:a+b, ...]
+        y_sim = y[a:a+b, ...]
 
         # PART 2 - Construct the cross-covariance sub-matrices
         sigma_eta = kernel.k_eta.cross_covariance(x, y)
@@ -86,8 +83,9 @@ class KOHKernelComputation(AbstractKernelComputation):
         -------
             Float[Array, "N M"]: The computed cross-covariance.
         """
-        # cross_cov = vmap(lambda x: vmap(lambda y: kernel(x, y))(y))(x)
-        # return cross_cov
+        a = kernel.num_field_obs
+        b = kernel.num_sim_obs
+        N = x.shape[0]
 
         # PART 1 & 2
         sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta = self._calc_sub_kernels(
@@ -95,23 +93,13 @@ class KOHKernelComputation(AbstractKernelComputation):
         )
 
         # PART 3 - Construct the output array
-        return sigma_eta + block_diag(sigma_delta + sigma_epsilon, sigma_epsilon_eta)
-
-
-    # def gram(
-    #     self,
-    #     kernel: Kernel,
-    #     x: Num[Array, "N D"],
-    # ) -> LinearOperator:
-    #     r"""Compute Gram covariance operator of the kernel function.
-
-    #     Args:
-    #         kernel (AbstractKernel): the kernel function.
-    #         x (Num[Array, "N N"]): The inputs to the kernel function.
-
-    #     Returns
-    #     -------
-    #         LinearOperator: Gram covariance operator of the kernel function.
-    #     """
-    #     Kxx = self.cross_covariance(kernel, x, x)
-    #     return PSD(Dense(Kxx))
+        return sigma_eta + pad(
+            block_diag(
+                sigma_delta + sigma_epsilon, 
+                sigma_epsilon_eta
+            ), 
+            (
+                (0, N-a-b), 
+                (0, N-a-b)
+            )
+        )

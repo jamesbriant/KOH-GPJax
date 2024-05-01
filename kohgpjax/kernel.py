@@ -15,20 +15,20 @@
 
 from dataclasses import dataclass
 
-from beartype.typing import Union
-import jax.numpy as jnp
+# from beartype.typing import Union
+# import jax.numpy as jnp
 from jaxtyping import Float
-import tensorflow_probability.substrates.jax.bijectors as tfb
-import tensorflow_probability.substrates.jax.distributions as tfd
+# import tensorflow_probability.substrates.jax.bijectors as tfb
+# import tensorflow_probability.substrates.jax.distributions as tfd
 
 from gpjax.base import param_field, static_field
 from gpjax.kernels.base import AbstractKernel
-from gpjax.kernels.stationary.utils import squared_distance
+# from gpjax.kernels.stationary.utils import squared_distance
 from gpjax.typing import (
     Array,
     ScalarFloat,
 )
-from kohgpjax.kohkernelcomputation import KOHKernelComputation
+from kohgpjax.computation import KOHKernelComputation
 from gpjax.kernels.computations import AbstractKernelComputation
 from gpjax.kernels.stationary import RBF
 
@@ -37,7 +37,8 @@ from gpjax.kernels.stationary import RBF
 class KOHKernel(AbstractKernel):
     r"""Kennedy & O'Hagan (2001) kernel. Made up of subkernels which represent different parts of the data."""
 
-    num_obs: int = static_field(None)
+    num_field_obs: int = static_field(None)
+    num_sim_obs: int = static_field(None)
     k_eta: AbstractKernel = param_field(RBF())
     k_delta: AbstractKernel = param_field(RBF())
     k_epsilon: AbstractKernel = param_field(RBF())
@@ -58,5 +59,5 @@ class KOHKernel(AbstractKernel):
         Returns:
             ScalarFloat: The value of $`k(x, y)`$.
         """
-        pass
-        # raise NotImplementedError
+        # pass
+        raise NotImplementedError
