@@ -218,6 +218,9 @@ def get_neg_log_dens() -> Callable[..., Float]:
         objective=objective,
     )
 
+def neg_log_dens(params: Array) -> Float:
+    return get_neg_log_dens()(params)
+
 
 
 
