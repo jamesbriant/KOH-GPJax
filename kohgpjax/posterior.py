@@ -204,7 +204,7 @@ class KOHPosterior(AbstractPosterior):
 
         ###### NEW METHOD ######
         # stack the regression and prediction inputs
-        x_stack = jnp.vstack((x, t))
+        x_stack = jnp.vstack((x, test_inputs))
 
         # compute the cross-covariance matrix
         K = self.prior.kernel.cross_covariance(x_stack, x_stack)
@@ -218,7 +218,7 @@ class KOHPosterior(AbstractPosterior):
         Sigma = Kxx #+ cola.ops.I_like(Kxx) * obs_noise
         Sigma = cola.PSD(Sigma)
 
-        mean_t = self.prior.mean_function(t)
+        mean_t = self.prior.mean_function(test_inputs)
         Sigma_inv_Kxt = cola.solve(Sigma, Kxt)
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
@@ -298,9 +298,9 @@ class KOHPosterior(AbstractPosterior):
         # obs_noise = self.likelihood.obs_stddev**2 # No longer used as already implemented into kernel
         mx = self.prior.mean_function(x)
 
-        ###### NEW METHOD ######
         # Calculate bias terms for prediction
-        Kddpred = self.prior.kernel.k_delta.cross_covariance(x, t)
+        num_field_obs = self.prior.kernel.num_field_obs
+        Kddpred = self.prior.kernel.k_delta.cross_covariance(x[:num_field_obs, :], t)
         Kdpreddpred = self.prior.kernel.k_delta.cross_covariance(t, t)
 
         # stack the regression and prediction inputs
@@ -314,7 +314,7 @@ class KOHPosterior(AbstractPosterior):
                 K[:n_train, :n_train]
             )
         )
-        Kxt = K[:n_train, n_train:] + Kddpred
+        Kxt = K[:n_train, n_train:] + jnp.pad(Kddpred, ((0, x.shape[0]-num_field_obs), (0, 0)))
         Ktt = cola.PSD(
             cola.ops.Dense(
                 K[n_train:, n_train:] + Kdpreddpred
