@@ -14,8 +14,8 @@ import numpy as np
 from jax import config
 config.update("jax_enable_x64", True)
 import jax.numpy as jnp
-from jax import random
-from jax import jit, grad
+# from jax import random
+# from jax import jit, grad
 
 import gpjax as gpx
 from kohgpjax.kernel import KOHKernel
@@ -23,6 +23,7 @@ from kohgpjax.posterior import *
 
 # from mappings import mapRto01, mapRto0inf, ell2rho
 from mappings import *
+
 
 class MatlabModel:
     def __init__(self, x, t, y):
@@ -53,11 +54,8 @@ class MatlabModel:
         )
     
 
-    def kernel(
-        self,
-        params
-    ) -> gpx.kernels.AbstractKernel:
-        theta, ell_eta_1, ell_eta_2, lambda_eta, lambda_delta, lambda_epsilon, lambda_epsilon_eta = self._params_to_kernel_params(params)
+    def kernel(self, params) -> gpx.kernels.AbstractKernel:
+        theta, ell_eta_1, ell_eta_2, ell_delta_1, lambda_eta, lambda_delta, lambda_epsilon, lambda_epsilon_eta = self._params_to_kernel_params(params)
 
         product_kernel = gpx.kernels.ProductKernel(
             kernels=[
@@ -68,7 +66,7 @@ class MatlabModel:
                 ), 
                 gpx.kernels.RBF(
                     active_dims=[1],
-                    lengthscale=jnp.array(ell_eta_2),
+                    lengthscale=jnp.array(ell_eta_2)
                 )
             ]
         )
@@ -77,8 +75,13 @@ class MatlabModel:
             num_field_obs=self.num_field_obs,
             num_sim_obs=self.num_sim_obs,
             k_eta=product_kernel,
-            k_delta=gpx.kernels.White(
+            # k_delta=gpx.kernels.White(
+            #     active_dims=[0],
+            #     variance=jnp.array(1/lambda_delta)
+            # ),
+            k_delta=gpx.kernels.RBF(
                 active_dims=[0],
+                lengthscale=jnp.array(ell_delta_1),
                 variance=jnp.array(1/lambda_delta)
             ),
             k_epsilon=gpx.kernels.White(
@@ -117,11 +120,12 @@ class MatlabModel:
         theta = mapRto01(params[0])
         ell_eta_1 = mapRto0inf(params[1])
         ell_eta_2 = mapRto0inf(params[2])
-        lambda_eta = mapRto0inf(params[3])
-        lambda_delta = mapRto0inf(params[4])
-        lambda_epsilon = mapRto0inf(params[5])
-        lambda_epsilon_eta = mapRto0inf(params[6])
-        return theta, ell_eta_1, ell_eta_2, lambda_eta, lambda_delta, lambda_epsilon, lambda_epsilon_eta
+        ell_delta_1 = mapRto0inf(params[3])
+        lambda_eta = mapRto0inf(params[4])
+        lambda_delta = mapRto0inf(params[5])
+        lambda_epsilon = mapRto0inf(params[6])
+        lambda_epsilon_eta = mapRto0inf(params[7])
+        return theta, ell_eta_1, ell_eta_2, ell_delta_1, lambda_eta, lambda_delta, lambda_epsilon, lambda_epsilon_eta
 
 
     def posterior(
@@ -146,9 +150,10 @@ class MatlabModel:
         # if lambda_epsilon_eta > 2e5 or lambda_epsilon_eta < 100.0:
         #     return -9e99
 
-        theta, ell_eta_1, ell_eta_2, lambda_eta, lambda_delta, lambda_epsilon, lambda_epsilon_eta = self._params_to_kernel_params(params)
+        theta, ell_eta_1, ell_eta_2, ell_delta_1, lambda_eta, lambda_delta, lambda_epsilon, lambda_epsilon_eta = self._params_to_kernel_params(params)
         rho_eta_1 = ell2rho(ell_eta_1)
         rho_eta_2 = ell2rho(ell_eta_2)
+        rho_delta_1 = ell2rho(ell_delta_1)
 
         ####### rho #######
         # % Prior for beta_eta
@@ -164,7 +169,7 @@ class MatlabModel:
         # rho_b = exp(-params.beta_b/4);
         # rho_b(rho_b>0.999) = 0.999;
         # logprior = logprior - .6*sum(log(1-rho_b));
-        # logprior += -0.6*jnp.log(1-rho_delta_1)
+        logprior += -0.6*jnp.log(1-rho_delta_1)
 
         ####### lambda #######
         # % Prior for lambda_eta
@@ -200,7 +205,7 @@ class MatlabModel:
 #     map01toR(0.4257), 
 #     map0inftoR(beta2ell(51.5551)), #these are the beta values!!!
 #     map0inftoR(beta2ell(3.5455)), 
-#     # map0inftoR(beta2ell(2)), 
+#     map0inftoR(beta2ell(2)), 
 #     map0inftoR(0.25557), 
 #     map0inftoR(37.0552), 
 #     map0inftoR(10030.5142), 
@@ -219,9 +224,7 @@ class MatlabModel:
 
 
 
-
-
-# xpred = jnp.round(jnp.linspace(0, 1, 1001, endpoint=True),2)
+# xpred = jnp.linspace(0, 1, 1000, endpoint=True)
 
 # gpjax_posterior = model.posterior(model_parameters)
 # gpjax_eta_pred = gpjax_posterior.predict_obs(
@@ -232,5 +235,3 @@ class MatlabModel:
 # m = gpjax_eta_pred.mean()
 # v = gpjax_eta_pred.variance()
 # sd = jnp.sqrt(v)
-
-# print(m)
