@@ -17,12 +17,10 @@ import beartype.typing as tp
 from beartype.typing import (
     Tuple,
 )
-from jax import vmap
 from jax.scipy.linalg import block_diag
 from jax.numpy import pad
 from jaxtyping import (
     Float,
-    Num,
 )
 
 import gpjax

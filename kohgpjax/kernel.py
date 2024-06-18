@@ -15,15 +15,10 @@
 
 from dataclasses import dataclass
 
-# from beartype.typing import Union
-# import jax.numpy as jnp
 from jaxtyping import Float
-# import tensorflow_probability.substrates.jax.bijectors as tfb
-# import tensorflow_probability.substrates.jax.distributions as tfd
 
 from gpjax.base import param_field, static_field
 from gpjax.kernels.base import AbstractKernel
-# from gpjax.kernels.stationary.utils import squared_distance
 from gpjax.typing import (
     Array,
     ScalarFloat,
