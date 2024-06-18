@@ -1,0 +1,10 @@
+numpy
+cola-ml
+jax
+jaxtyping
+gpjax
+mici
+arviz
+matplotlib
+beartype
+ipykernel
