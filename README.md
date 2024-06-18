@@ -6,6 +6,9 @@ KOH-GPJax is an extension to the [GPJax](https://github.com/JaxGaussianProcesses
 By combining the power of [Jax](https://jax.readthedocs.io/en/latest/), the excellent modular design of GPJax and the latest gradient based MCMC methods, KOH-GPJax aims to provide a Bayesian calibration framework for large-scale computer simulations. Examples include nuclear fusion simulations (UKAEA) and weather simulations (UK Met Office).
 
 ## Where to Start
+
+Note: at the time of writing the latest version of GPJax (0.8.2) is not compatitable with python 3.12. Instead use python 3.11.
+
 - MCMC schemes are implemented in jupyter notebooks starting with `mici_[...].ipynb`.
 - Comparisons between Mici implementations and GPJax implementations are in jupyter notebooks titled `MATLAB_vs_Mici.ipynb` and similar.
 - Model implementations are in files titled `matlabmodel.py` and similar.
