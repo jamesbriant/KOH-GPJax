@@ -13,48 +13,21 @@
 # limitations under the License.
 # ==============================================================================
 
-from abc import abstractmethod
 from dataclasses import dataclass
-from typing import overload
 
-from beartype.typing import (
-    Any,
-    Callable,
-    Optional,
-    Union,
-)
 import cola
-from cola.linalg.decompositions.decompositions import Cholesky
 import jax.numpy as jnp
-from jax.random import (
-    PRNGKey,
-    normal,
-)
 from jaxtyping import (
-    Float,
     Num,
 )
 
-from gpjax.base import (
-    Module,
-    param_field,
-    static_field,
-)
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
-from gpjax.kernels import RFF
-from gpjax.kernels.base import AbstractKernel
 from gpjax.likelihoods import (
-    AbstractLikelihood,
     Gaussian,
-    NonGaussianLikelihood,
 )
-from gpjax.lower_cholesky import lower_cholesky
-from gpjax.mean_functions import AbstractMeanFunction
 from gpjax.typing import (
     Array,
-    FunctionalSample,
-    KeyArray,
 )
 
 from kohgpjax.kernel import KOHKernel
@@ -345,26 +318,6 @@ class KOHPosterior(AbstractPosterior):
 #######################
 # Utils
 #######################
-
-
-# @overload
-# def construct_posterior(prior: Prior, likelihood: Gaussian) -> ConjugatePosterior:
-#     ...
-
-
-# @overload
-# def construct_posterior(
-#     prior: Prior, likelihood: NonGaussianLikelihood
-# ) -> NonConjugatePosterior:
-#     ...
-
-
-# @overload
-# def construct_posterior(
-#     prior: Prior, likelihood: AbstractLikelihood
-# ) -> AbstractPosterior:
-#     ...
-
 
 def construct_posterior(prior, likelihood):
     r"""Utility function for constructing a posterior object from a prior and
