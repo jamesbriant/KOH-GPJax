@@ -28,8 +28,9 @@ class MatlabModel(AbstractKOHModel):
     
     def k_delta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
         thetas, ells, lambdas = GPJAX_params
-        return gpx.kernels.White(
+        return gpx.kernels.RBF(
                 active_dims=[0],
+                lengthscale=jnp.array(ells[2]),
                 variance=jnp.array(1/lambdas[1])
             )
     
@@ -59,6 +60,7 @@ class MatlabModel(AbstractKOHModel):
 
         rho_eta_1 = ell2rho(ells[0])
         rho_eta_2 = ell2rho(ells[1])
+        rho_delta_1 = ell2rho(ells[2])
 
         ####### rho #######
         # % Prior for beta_eta
@@ -74,7 +76,7 @@ class MatlabModel(AbstractKOHModel):
         # rho_b = exp(-params.beta_b/4);
         # rho_b(rho_b>0.999) = 0.999;
         # logprior = logprior - .6*sum(log(1-rho_b));
-        # logprior += -0.6*jnp.log(1-rho_delta_1)
+        logprior += -0.6*jnp.log(1-rho_delta_1)
 
         ####### lambda #######
         # % Prior for lambda_eta
