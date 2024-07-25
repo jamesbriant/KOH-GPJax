@@ -117,7 +117,7 @@ class AbstractKOHModel:
 
     def get_KOH_neg_log_pos_dens_func(
             self,
-            transform_params_to_GPJAX: Callable[[jnp.ndarray], jnp.ndarray] = lambda x: x
+            transform_params_to_GPJAX: Callable[[list], list] = lambda x: x
     ) -> Callable[..., Float]:
         """Returns a function which calculates the negative log density of the model.
         Note the first parameter argument must be the calibration parameters.
@@ -126,6 +126,6 @@ class AbstractKOHModel:
             GPJAX_params = transform_params_to_GPJAX(MCMC_params)
             return self.objective()(
                 self.GP_posterior(GPJAX_params), 
-                self.dataset(GPJAX_params[0])
+                self.dataset(jnp.array(GPJAX_params[0]))
             ) - self.KOH_log_prior(GPJAX_params)
         return neg_log_dens
