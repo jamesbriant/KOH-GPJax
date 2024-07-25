@@ -2,9 +2,13 @@ import numpy as np
 import jax.numpy as jnp
 
 class DataLoader:
-    def __init__(self):
-        DATAFIELD = np.loadtxt('data/simple_field.csv', delimiter=',', dtype=np.float32)
-        DATACOMP = np.loadtxt('data/simple_comp.csv', delimiter=',', dtype=np.float32)
+    def __init__(
+            self, 
+            data_field_path: str = 'data/simple_field.csv', 
+            data_comp_path: str = 'data/simple_comp.csv'
+    ):
+        DATAFIELD = np.loadtxt(data_field_path, delimiter=',', dtype=np.float32)
+        DATACOMP = np.loadtxt(data_comp_path, delimiter=',', dtype=np.float32)
 
         self.xf = np.reshape(DATAFIELD[:, 0], (-1, 1))
         self.xc = np.reshape(DATACOMP[:, 0], (-1,1))

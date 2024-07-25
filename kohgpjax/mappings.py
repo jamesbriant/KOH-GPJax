@@ -1,4 +1,4 @@
-from jax import numpy as jnp
+import jax.numpy as jnp
 from jaxtyping import Float
 
 def mapRto01(omega) -> Float:
@@ -13,9 +13,3 @@ def mapRto0inf(omega) -> Float:
 
 def map0inftoR(theta) -> Float:
     return jnp.log(theta)
-
-def ell2rho(l) -> Float:
-    return jnp.exp(-1/(8*l**2))
-
-def beta2ell(beta) -> Float:
-    return 1/jnp.sqrt(2*beta)
