@@ -111,6 +111,6 @@ final_states, traces, stats = sampler.sample_chains(
 end_time = process_time()
 elapsed_time = end_time - start_time
 print()
-f = open("elapsed_time_mcmc.txt", "x")
+f = open("elapsed_time_mcmc.txt", "a")
 f.write(f"Elapsed time: {elapsed_time:.3f} seconds.")
 f.close()
