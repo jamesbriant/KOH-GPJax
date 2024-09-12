@@ -151,39 +151,23 @@ class KOHPosterior(AbstractPosterior):
         # obs_noise = self.likelihood.obs_stddev**2 # No longer used as already implemented into kernel
         mx = self.prior.mean_function(x)
 
-        ###### GPJax METHOD ######
-        # # Precompute Gram matrix, Kxx, at training inputs, x
-        # Kxx = self.prior.kernel.gram(x)
-        # Kxx += cola.ops.I_like(Kxx) * self.jitter
-
-        # # Σ = Kxx + Io²
-        # Sigma = Kxx + cola.ops.I_like(Kxx) * obs_noise
-        # Sigma = cola.PSD(Sigma)
-
-        # mean_t = self.prior.mean_function(t)
-        # Ktt = self.prior.kernel.gram(t)
-        # Kxt = self.prior.kernel.cross_covariance(x, t)
-        # Sigma_inv_Kxt = cola.solve(Sigma, Kxt)
-
-        # # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
-        # mean = mean_t + jnp.matmul(Sigma_inv_Kxt.T, y - mx)
-
-        # # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
-        # covariance = Ktt - jnp.matmul(Kxt.T, Sigma_inv_Kxt)
-        # covariance += cola.ops.I_like(covariance) * self.prior.jitter
-        # covariance = cola.PSD(covariance)
-
-
-
         ###### NEW METHOD ######
         # stack the regression and prediction inputs
-        x_stack = jnp.vstack((x, test_inputs))
+        x_stack = jnp.vstack((x, t))
 
         # compute the cross-covariance matrix
         K = self.prior.kernel.cross_covariance(x_stack, x_stack)
-        Kxx = cola.PSD(cola.ops.Dense(K[:n_train, :n_train]))
+        Kxx = cola.PSD(
+            cola.ops.Dense(
+                K[:n_train, :n_train]
+            )
+        )
         Kxt = K[:n_train, n_train:]
-        Ktt = cola.PSD(cola.ops.Dense(K[n_train:, n_train:]))
+        Ktt = cola.PSD(
+            cola.ops.Dense(
+                K[n_train:, n_train:]
+            )
+        )
 
         Kxx += cola.ops.I_like(Kxx) * self.jitter
 
@@ -191,7 +175,7 @@ class KOHPosterior(AbstractPosterior):
         Sigma = Kxx #+ cola.ops.I_like(Kxx) * obs_noise
         Sigma = cola.PSD(Sigma)
 
-        mean_t = self.prior.mean_function(test_inputs)
+        mean_t = self.prior.mean_function(t)
         Sigma_inv_Kxt = cola.solve(Sigma, Kxt)
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
@@ -209,6 +193,68 @@ class KOHPosterior(AbstractPosterior):
         self,
         test_inputs: Num[Array, "N D"],
         train_data: Dataset,
+    ) -> GaussianDistribution:
+        r"""Query the predictive posterior distribution.
+
+        Conditional on a training data set, compute the GP's posterior
+        predictive distribution for a given set of parameters. The returned function
+        can be evaluated at a set of test inputs to compute the corresponding
+        predictive density.
+
+        The predictive distribution of a conjugate GP is given by
+        $$
+            p(\mathbf{f}^{\star}\mid \mathbf{y}) & = \int p(\mathbf{f}^{\star} \mathbf{f} \mid \mathbf{y})\\
+            & =\mathcal{N}(\mathbf{f}^{\star} \boldsymbol{\mu}_{\mid \mathbf{y}}, \boldsymbol{\Sigma}_{\mid \mathbf{y}}
+        $$
+        where
+        $$
+            \boldsymbol{\mu}_{\mid \mathbf{y}} & = k(\mathbf{x}^{\star}, \mathbf{x})\left(k(\mathbf{x}, \mathbf{x}')+\sigma^2\mathbf{I}_n\right)^{-1}\mathbf{y}  \\
+            \boldsymbol{\Sigma}_{\mid \mathbf{y}} & =k(\mathbf{x}^{\star}, \mathbf{x}^{\star\prime}) -k(\mathbf{x}^{\star}, \mathbf{x})\left( k(\mathbf{x}, \mathbf{x}') + \sigma^2\mathbf{I}_n \right)^{-1}k(\mathbf{x}, \mathbf{x}^{\star}).
+        $$
+
+        The conditioning set is a GPJax `Dataset` object, whilst predictions
+        are made on a regular Jax array.
+
+        Example:
+            For a `posterior` distribution, the following code snippet will
+            evaluate the predictive distribution.
+            ```python
+                >>> import gpjax as gpx
+                >>> import jax.numpy as jnp
+                >>>
+                >>> xtrain = jnp.linspace(0, 1).reshape(-1, 1)
+                >>> ytrain = jnp.sin(xtrain)
+                >>> D = gpx.Dataset(X=xtrain, y=ytrain)
+                >>> xtest = jnp.linspace(0, 1).reshape(-1, 1)
+                >>>
+                >>> prior = gpx.gps.Prior(mean_function = gpx.mean_functions.Zero(), kernel = gpx.kernels.RBF())
+                >>> posterior = prior * gpx.likelihoods.Gaussian(num_datapoints = D.n)
+                >>> predictive_dist = posterior(xtest, D)
+            ```
+
+        Args:
+            test_inputs (Num[Array, "N D"]): A Jax array of test inputs at which the
+                predictive distribution is evaluated.
+            train_data (Dataset): A `gpx.Dataset` object that contains the input and
+                output data used for training dataset.
+
+        Returns
+        -------
+            GaussianDistribution: A function that accepts an input array and
+                returns the predictive distribution as a `GaussianDistribution`.
+        """
+        return self.predict_zeta(
+            test_inputs=test_inputs,
+            train_data=train_data,
+            include_observation_noise=True,
+        )
+
+
+    def predict_zeta(
+        self,
+        test_inputs: Num[Array, "N D"],
+        train_data: Dataset,
+        include_observation_noise: bool = False,
     ) -> GaussianDistribution:
         r"""Query the predictive posterior distribution.
 
@@ -293,6 +339,8 @@ class KOHPosterior(AbstractPosterior):
                 K[n_train:, n_train:] + Kdpreddpred
             )
         )
+        if include_observation_noise:
+            Ktt += self.prior.kernel.k_epsilon.cross_covariance(t, t)
 
         Kxx += cola.ops.I_like(Kxx) * self.jitter
 
