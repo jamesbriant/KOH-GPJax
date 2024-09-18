@@ -16,7 +16,7 @@ from time import process_time
 
 ################## Load data ##################
 
-dataloader = DataLoader('data/matlab/simple_field_medium.csv', 'data/matlab/simple_comp.csv')
+dataloader = DataLoader('data/matlab/simple_field.csv', 'data/matlab/simple_comp.csv')
 data = dataloader.get_data() # loads normalised/standardised data
 model = KOHmodel.MatlabModel(*data)
 
@@ -111,6 +111,6 @@ final_states, traces, stats = sampler.sample_chains(
 end_time = process_time()
 elapsed_time = end_time - start_time
 print()
-f = open("elapsed_time_mcmc.txt", "w")
+f = open("elapsed_time_mcmc.txt", "w+")
 f.write(f"Elapsed time: {elapsed_time:.3f} seconds.")
 f.close()
