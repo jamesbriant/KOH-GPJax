@@ -14,6 +14,10 @@ Note: at the time of writing the latest version of GPJax (0.8.2) is not compatit
 - Model implementations are in files titled `matlabmodel.py` and similar.
 - The files which extend GPJax are under the `kohgpjax/` directory.
 
+## Installation
+
+To run the notebooks under `tests/` install the kohgpjax package by executing `pip install -e .` in the root directory.
+
 ## To-Do
 Very vague outline of this project: 
 - [x] Create suitable kernel  

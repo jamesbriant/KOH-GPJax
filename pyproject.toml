@@ -1,0 +1,15 @@
+[project]
+name = "kohgpjax"  # Name of your package
+version = "0.0.1"  # Version of your package
+description = "Kennedy & O'Hagan Bayesian calibration framework written in JAX"  # Description of your package
+authors = [ # List of authors
+    {name="James Briant", email="james.briant.21@ucl.ac.uk"}
+]
+
+# [build-system]
+# # requires = ["jax", "gpjax", "jaxtyping", "cola"]  # Build requirements
+# requires = ["kohgpjax"]
+
+# [dependencies]
+# dependency1 = "version_of_dependency1"  # List of project dependencies
+# dependency2 = "version_of_dependency2"
