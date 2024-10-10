@@ -112,22 +112,19 @@ def trace_func(state):
     }
 
 
-# n_warm_up_iter = 200
-n_warm_up_iter = 50
-
-# n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200, 1500, 2000, 3000, 4000, 5000]: #, 7500, 10000, 14000, 20000]:
-n_main_iters = [30, 50]#, 75]
-# n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
+# n_warm_up_iter = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
+n_warm_up_iter = [50, 70]
+n_main_iters = 500
 
 ################## Iterate over samplers ##################
 for sampler_name, sampler in samplers.items():
     params_transformed_mean = {}
     params_transformed_std = {}
 
-    for N in n_main_iters:
+    for W in n_warm_up_iter:
         final_states, traces, stats = sampler.sample_chains(
-            n_warm_up_iter, 
-            N, 
+            W, 
+            n_main_iters, 
             init_states, 
             adapters=adapters, 
             n_process=n_chain, # only 1 works on MacOS
@@ -157,18 +154,18 @@ for sampler_name, sampler in samplers.items():
     for i, var in enumerate(params_transformed_mean):
         ax = axes.flatten()[i]
         ax.set_xscale('log')
-        ax.plot(n_main_iters, params_transformed_mean[var], 'o-', label='mean')
+        ax.plot(n_warm_up_iter, params_transformed_mean[var], 'o-', label='mean')
         ax.fill_between(
-            n_main_iters, 
+            n_warm_up_iter, 
             np.array(params_transformed_mean[var])-np.array(params_transformed_std[var]), 
             np.array(params_transformed_mean[var])+np.array(params_transformed_std[var]), 
             alpha=0.3
         )
-        ax.set_xlabel('Number of iterations, N')
+        ax.set_xlabel('Number of warm-up iterations, W')
         ax.set_ylabel('mean')
 
         ax2 = ax.twinx()
-        ax2.plot(n_main_iters, params_transformed_std[var], 'x--', color='tab:orange', label='std')
+        ax2.plot(n_warm_up_iter, params_transformed_std[var], 'x--', color='tab:orange', label='std')
         ax2.set_ylabel('std')
 
         ax.legend(loc=2)
@@ -178,7 +175,7 @@ for sampler_name, sampler in samplers.items():
 
     axes[0,0].axhline(0.4, color='k', linestyle='--')
     axes[3,0].axhline(400, color='k', linestyle='--')
-    fig.suptitle(f'Convergence of parameters for {sampler_name} sampler\nW={n_warm_up_iter}')
+    fig.suptitle(f'Convergence of parameters for {sampler_name} sampler\nN={n_warm_up_iter}')
     plt.tight_layout()
-    plt.savefig(f'convergence/params-convergence-fixed-W-{sampler_name}.png')
+    plt.savefig(f'convergence/params-convergence-fixed-N-{sampler_name}.png')
     plt.close()
