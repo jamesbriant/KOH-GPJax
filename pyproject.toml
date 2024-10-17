@@ -6,10 +6,13 @@ authors = [ # List of authors
     {name="James Briant", email="james.briant.21@ucl.ac.uk"}
 ]
 
-# [build-system]
-# # requires = ["jax", "gpjax", "jaxtyping", "cola"]  # Build requirements
-# requires = ["kohgpjax"]
+[build-system]
+requires = [ # Build requirements
+    "setuptools",
+    "jax", 
+    "jaxtyping", 
+    "gpjax==0.8.2", 
+    "cola-ml"
+]
 
 # [dependencies]
-# dependency1 = "version_of_dependency1"  # List of project dependencies
-# dependency2 = "version_of_dependency2"
