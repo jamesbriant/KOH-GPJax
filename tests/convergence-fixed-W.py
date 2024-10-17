@@ -9,12 +9,17 @@ import numpy as np
 
 import mici
 
+n_warm_up_iter = 200
+
 ################## Parse arguments ##################
 if int(sys.argv[1]) == 0:
-    sampler_name = 'static_3'
+    sampler_name = 'dynamic'
     n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
 elif int(sys.argv[1]) == 1:
-    sampler_name = 'dynamic'
+    if len(sys.argv) < 3:
+        raise ValueError('Please provide number of leapfrog steps')
+    n_steps = int(sys.argv[2])
+    sampler_name = f'static-{n_steps}'
     n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
 else:
     raise ValueError('Invalid sampler')
@@ -99,10 +104,10 @@ n_chain = 1
 rng = np.random.default_rng(seed)
 
 ##### Mici sampler and adapters #####
-samplers = {
-    'static_3': mici.samplers.StaticMetropolisHMC(system, integrator, rng, n_step=3),
-    'dynamic': mici.samplers.DynamicMultinomialHMC(system, integrator, rng)
-}
+if sampler_name == 'dynamic':
+    sampler = mici.samplers.DynamicMultinomialHMC(system, integrator, rng)
+else:
+    sampler = mici.samplers.StaticMetropolisHMC(system, integrator, rng, n_step=n_steps)
 
 adapters = [
     mici.adapters.DualAveragingStepSizeAdapter(0.8),
@@ -122,21 +127,6 @@ def trace_func(state):
         'hamiltonian': system.h(state)
     }
 
-
-n_warm_up_iter = 200
-# n_warm_up_iter = 50
-
-# n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200, 1500, 2000, 3000, 4000, 5000]: #, 7500, 10000, 14000, 20000]:
-# n_main_iters = [30, 50]#, 75]
-# n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
-
-################## Iterate over samplers ##################
-# for sampler_name, sampler in samplers.items():
-
-
-# No longer iterating over the sampler.
-# Only one sampler is used in this script.
-sampler = samplers[sampler_name]
 
 params_transformed_mean = {}
 params_transformed_std = {}
@@ -169,42 +159,7 @@ for N in n_main_iters:
 
 np.savez(
     f"convergence/params-transformed-fixed-W-{n_warm_up_iter}-{sampler_name}.npz", 
-    [
-        n_main_iters,
-        params_transformed_mean, 
-        params_transformed_std
-    ]
+    n_main_iters=n_main_iters,
+    params_transformed_mean=params_transformed_mean, 
+    params_transformed_std=params_transformed_std
 )
-
-
-# ################## Save results ##################
-# fig, axes = plt.subplots(4, 2, figsize=(8, 12))
-
-# for i, var in enumerate(params_transformed_mean):
-#     ax = axes.flatten()[i]
-#     ax.set_xscale('log')
-#     ax.plot(n_main_iters, params_transformed_mean[var], 'o-', label='mean')
-#     ax.fill_between(
-#         n_main_iters, 
-#         np.array(params_transformed_mean[var])-np.array(params_transformed_std[var]), 
-#         np.array(params_transformed_mean[var])+np.array(params_transformed_std[var]), 
-#         alpha=0.3
-#     )
-#     ax.set_xlabel('Number of iterations, N')
-#     ax.set_ylabel('mean')
-
-#     ax2 = ax.twinx()
-#     ax2.plot(n_main_iters, params_transformed_std[var], 'x--', color='tab:orange', label='std')
-#     ax2.set_ylabel('std')
-
-#     ax.legend(loc=2)
-#     ax2.legend(loc=1)
-
-#     ax.set_title(var)
-
-# axes[0,0].axhline(0.4, color='k', linestyle='--')
-# axes[3,0].axhline(400, color='k', linestyle='--')
-# fig.suptitle(f'Convergence of parameters for {sampler_name} sampler\nW={n_warm_up_iter}')
-# plt.tight_layout()
-# plt.savefig(f'convergence/params-convergence-fixed-W-{sampler_name}.png')
-# plt.close()
