@@ -9,18 +9,24 @@ import numpy as np
 
 import mici
 
-n_main_iter = 800
-
 ################## Parse arguments ##################
 if int(sys.argv[1]) == 0:
     sampler_name = 'dynamic'
-    n_warm_up_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
+    # n_warm_up_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
+    # n_warm_up_iters = [30, 50, 75, 100, 150, 200]
+    n_warm_up_iters = [30]
+    # n_main_iter = 400
+    n_main_iter = 200
 elif int(sys.argv[1]) == 1:
     if len(sys.argv) < 3:
         raise ValueError('Please provide number of leapfrog steps')
     n_steps = int(sys.argv[2])
     sampler_name = f'static-{n_steps}'
-    n_warm_up_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
+    # n_warm_up_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
+    # n_warm_up_iters = [30, 50, 75, 100, 150, 200]
+    n_warm_up_iters = [30]
+    # n_main_iter = 400
+    n_main_iter = 200
 else:
     raise ValueError('Invalid sampler')
 
