@@ -17,13 +17,13 @@ import mici
 # python tests/convergence-fixed-N.py 100 100 static 3
 
 ################## Parse arguments ##################
-n_warm_up_iter = sys.argv[1]
-n_main_iter = sys.argv[2]
+n_warm_up_iter = int(sys.argv[1])
+n_main_iter = int(sys.argv[2])
 hmc_mode = sys.argv[3]
 if hmc_mode == 'dynamic':
     sampler_name = 'dynamic'
 elif hmc_mode == 'static':
-    n_steps = sys.argv[4]
+    n_steps = int(sys.argv[4])
     sampler_name = f'static-{n_steps}'
 else:
     raise ValueError('Invalid sampler')
