@@ -5,24 +5,25 @@ from kohgpjax.mappings import mapRto01, map01toR, mapRto0inf, map0inftoR
 from jax import jit, grad
 
 import numpy as np
-# import matplotlib.pyplot as plt
 
 import mici
 
+################## Usage ##################
+# python tests/convergence.py n_warm_up_iter n_main_iter hmc_mode [n_steps]
+# e.g.
+# python tests/convergence.py 100 100 dynamic
+# or
+# python tests/convergence.py 100 100 static 3
+
 ################## Parse arguments ##################
-if int(sys.argv[1]) == 0:
+n_warm_up_iter = int(sys.argv[1])
+n_main_iter = int(sys.argv[2])
+hmc_mode = sys.argv[3]
+if hmc_mode == 'dynamic':
     sampler_name = 'dynamic'
-    # n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
-    n_main_iters = [50, 75, 100, 150, 200, 300, 500]
-    n_warm_up_iter = 100
-elif int(sys.argv[1]) == 1:
-    if len(sys.argv) < 3:
-        raise ValueError('Please provide number of leapfrog steps')
-    n_steps = int(sys.argv[2])
+elif hmc_mode == 'static':
+    n_steps = int(sys.argv[4])
     sampler_name = f'static-{n_steps}'
-    # n_main_iters = [30, 50, 75, 100, 150, 200, 300, 500, 700, 900, 1200]
-    n_main_iters = [50, 75, 100, 150, 200, 300, 500, 700]
-    n_warm_up_iter = 150
 else:
     raise ValueError('Invalid sampler')
 
@@ -106,7 +107,7 @@ n_chain = 1
 rng = np.random.default_rng(seed)
 
 ##### Mici sampler and adapters #####
-if sampler_name == 'dynamic':
+if hmc_mode == 'dynamic':
     sampler = mici.samplers.DynamicMultinomialHMC(system, integrator, rng)
 else:
     sampler = mici.samplers.StaticMetropolisHMC(system, integrator, rng, n_step=n_steps)
@@ -133,35 +134,32 @@ def trace_func(state):
 params_transformed_mean = {}
 params_transformed_std = {}
 
-for N in n_main_iters:
-    final_states, traces, stats = sampler.sample_chains(
-        n_warm_up_iter, 
-        N, 
-        init_states, 
-        adapters=adapters, 
-        n_process=n_chain, # only 1 works on MacOS
-        trace_funcs=[trace_func]
-    )
+final_states, traces, stats = sampler.sample_chains(
+    n_warm_up_iter, 
+    n_main_iter, 
+    init_states, 
+    adapters=adapters, 
+    n_process=n_chain, # only 1 works on MacOS
+    trace_funcs=[trace_func]
+)
 
-    for var, trace in traces.items():
-        if var == 'hamiltonian':
-            continue
-        var_name = var.split('m_')[1]
-        if var_name == 'theta':
-            params_transformed_mean.setdefault(var_name, []).append(np.mean(mapRto01(trace[0])*(tmax-tmin) + tmin))
-            params_transformed_std.setdefault(var_name, []).append(np.std(mapRto01(trace[0])*(tmax-tmin) + tmin))
-        elif var_name.startswith('ell'):
-            params_transformed_mean.setdefault(var_name, []).append(np.mean(mapRto0inf(trace[0])))
-            params_transformed_std.setdefault(var_name, []).append(np.std(mapRto0inf(trace[0])))
-        elif var_name.startswith('lambda'):
-            params_transformed_mean.setdefault(var_name, []).append(np.mean(mapRto0inf(trace[0])))
-            params_transformed_std.setdefault(var_name, []).append(np.std(mapRto0inf(trace[0])))
+for var, trace in traces.items():
+    if var == 'hamiltonian':
+        continue
+    var_name = var.split('m_')[1]
+    if var_name == 'theta':
+        params_transformed_mean[var_name] = np.mean(mapRto01(trace[0])*(tmax-tmin) + tmin)
+        params_transformed_std[var_name] = np.std(mapRto01(trace[0])*(tmax-tmin) + tmin)
+    elif var_name.startswith('ell'):
+        params_transformed_mean[var_name] = np.mean(mapRto0inf(trace[0]))
+        params_transformed_std[var_name] = np.std(mapRto0inf(trace[0]))
+    elif var_name.startswith('lambda'):
+        params_transformed_mean[var_name] = np.mean(mapRto0inf(trace[0]))
+        params_transformed_std[var_name] = np.std(mapRto0inf(trace[0]))
 
-    # print(params_transformed_mean)
 
 np.savez(
-    f"convergence/params-transformed-fixed-W-{n_warm_up_iter}-{sampler_name}.npz", 
-    n_main_iters=n_main_iters,
+    f"convergence/W={n_warm_up_iter}-N={n_main_iter}.npz",
     params_transformed_mean=params_transformed_mean, 
     params_transformed_std=params_transformed_std
 )
