@@ -1,8 +1,11 @@
 __pycache__
 .vscode
+build/
 
 kohgpjax.egg-info/
 
 data/timings/
 
 environment.yml
+*.npz
+*.npy
