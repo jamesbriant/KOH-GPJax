@@ -55,31 +55,66 @@ class Model(AbstractKOHModel):
     ) -> Float:
         thetas, ells, lambdas = GPJAX_params
 
+        # ####### ell #######
+        # # % Prior for ell_eta
+        # # % EXAMPLE: ell_eta_0 ~ GAM(2,1) where 2nd param is rate
+        # logprior = (2-1)*jnp.log(ells[0]) - 1*ells[0]
+        # # % Prior for ell_eta_1 ~ GAM(3,0.5) where 2nd param is rate
+        # logprior += (3-1)*jnp.log(ells[1]) - 0.5*ells[1]
+        # # % Prior for ell_delta_0 ~ GAM(3,3) where 2nd param is rate
+        # logprior += (3-1)*jnp.log(ells[2]) - 3*ells[2]
+        # # lax.cond(ells[2] < 10, lambda x: x, lambda x: x+9e99, logprior)
+
         ####### ell #######
         # % Prior for ell_eta
-        # % EXAMPLE: ell_eta_0 ~ GAM(2,1)
-        logprior = (2-1)*jnp.log(ells[0]) - 1*ells[0]
-        # % Prior for ell_eta_1 ~ GAM(3,0.5)
-        logprior += (3-1)*jnp.log(ells[1]) - 0.5*ells[1]
-        # % Prior for ell_delta_0 ~ GAM(3,3)
-        logprior += (3-1)*jnp.log(ells[2]) - 3*ells[2]
+        # % EXAMPLE: ell_eta_0 ~ GAM(4,1.4) where 2nd param is rate
+        logprior = (4-1)*jnp.log(ells[0]) - 1.4*ells[0]
+        # % Prior for ell_eta_1 ~ GAM(2,3.5) where 2nd param is rate
+        logprior += (2-1)*jnp.log(ells[1]) - 3.5*ells[1]
+        # # % Prior for ell_delta_0 ~ GAM(4,1) where 2nd param is rate
+        # logprior += (4-1)*jnp.log(ells[2]) - 1*ells[2]
+        # # % Prior for ell_delta_0 ~ GAM(4,2) where 2nd param is rate
+        logprior += (4-1)*jnp.log(ells[2]) - 2*ells[2] # encourage smaller lengthscales on the discrepancy term
+        # % Prior for ell_delta_0 ~ GAM(2,0.3) where 2nd param is rate
+        # logprior += (2-1)*jnp.log(ells[2]) - 0.3*ells[2]
         # lax.cond(ells[2] < 10, lambda x: x, lambda x: x+9e99, logprior)
+
+        # ####### lambda #######
+        # # % Prior for lambda_eta
+        # # % EXAMPLE: lambda_eta ~ GAM(2,1) where 2nd param is rate
+        # logprior += (2-1)*jnp.log(lambdas[0]) - 1*lambdas[0]
+
+        # # % Prior for lambda_b
+        # # % EXAMPLE: lambda_b ~ GAM(10,.33) where 2nd param is rate
+        # logprior += (10-1)*jnp.log(lambdas[1]) - 0.33*lambdas[1]
+
+        # # % Prior for lambda_e
+        # # % EXAMPLE: lambda_e ~ GAM(12,0.025) where 2nd param is rate
+        # logprior += (12-1)*jnp.log(lambdas[2]) - 0.025*lambdas[2]
+
+        # # % Prior for lambda_en
+        # # % EXAMPLE: lambda_en ~ GAM(10,.001) where 2nd param is rate
+        # logprior += (10-1)*jnp.log(lambdas[3]) - 0.001*lambdas[3]
 
         ####### lambda #######
         # % Prior for lambda_eta
-        # % EXAMPLE: lambda_eta ~ GAM(2,1)
-        logprior += (2-1)*jnp.log(lambdas[0]) - 1*lambdas[0]
+        # % EXAMPLE: lambda_eta ~ GAM(2,4) where 2nd param is rate
+        logprior += (2-1)*jnp.log(lambdas[0]) - 4*lambdas[0]
+
+        # # % Prior for lambda_b
+        # # % EXAMPLE: lambda_b ~ GAM(10,0.3) where 2nd param is rate
+        # logprior += (10-1)*jnp.log(lambdas[1]) - 0.3*lambdas[1]
 
         # % Prior for lambda_b
-        # % EXAMPLE: lambda_b ~ GAM(10,.33)
-        logprior += (10-1)*jnp.log(lambdas[1]) - 0.33*lambdas[1]
+        # % EXAMPLE: lambda_b ~ GAM(2,0.1) where 2nd param is rate
+        logprior += (2-1)*jnp.log(lambdas[1]) - 0.1*lambdas[1]
 
         # % Prior for lambda_e
-        # % EXAMPLE: lambda_e ~ GAM(12,0.025)
+        # % EXAMPLE: lambda_e ~ GAM(12,0.025) where 2nd param is rate
         logprior += (12-1)*jnp.log(lambdas[2]) - 0.025*lambdas[2]
 
         # % Prior for lambda_en
-        # % EXAMPLE: lambda_en ~ GAM(10,.001)
+        # % EXAMPLE: lambda_en ~ GAM(10,0.001) where 2nd param is rate
         logprior += (10-1)*jnp.log(lambdas[3]) - 0.001*lambdas[3]
 
         return logprior
