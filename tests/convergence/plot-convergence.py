@@ -7,12 +7,12 @@ import matplotlib.pyplot as plt
 # named 'dynamic' and 'static-3'
 
 N_fixed = {
-    'dynamic': 100,
-    'static-3': 100,
+    'dynamic': 300,
+    'static-3': 500,
 }
 W_fixed = {
-    'dynamic': 50,
-    'static-3': 50,
+    'dynamic': 100,
+    'static-3': 200,
 }
 
 
@@ -37,6 +37,14 @@ for hmc_mode in ['dynamic', 'static-3']:
                     params_transformed_stds[var] = []
                 params_transformed_means[var].append(means[var])
                 params_transformed_stds[var].append(stds[var])
+
+    # sort by number of warm-up iterations
+    sorted_indices = np.argsort(n_warm_up_iters)
+    n_warm_up_iters = np.array(n_warm_up_iters)[sorted_indices]
+    print(n_warm_up_iters)
+    for var in params_transformed_means:
+        params_transformed_means[var] = np.array(params_transformed_means[var])[sorted_indices]
+        params_transformed_stds[var] = np.array(params_transformed_stds[var])[sorted_indices]
 
     ################## Make figure ##################
     fig, axes = plt.subplots(4, 2, figsize=(8, 12))
@@ -91,6 +99,14 @@ for hmc_mode in ['dynamic', 'static-3']:
                     params_transformed_stds[var] = []
                 params_transformed_means[var].append(means[var])
                 params_transformed_stds[var].append(stds[var])
+
+    # sort by number of main iterations
+    sorted_indices = np.argsort(n_main_iters)
+    n_main_iters = np.array(n_main_iters)[sorted_indices]
+    print(n_main_iters)
+    for var in params_transformed_means:
+        params_transformed_means[var] = np.array(params_transformed_means[var])[sorted_indices]
+        params_transformed_stds[var] = np.array(params_transformed_stds[var])[sorted_indices]
 
     ################## Make figure ##################
     fig, axes = plt.subplots(4, 2, figsize=(8, 12))
