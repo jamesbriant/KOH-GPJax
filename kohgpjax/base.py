@@ -1,32 +1,38 @@
-from typing import Callable
 from abc import abstractmethod
+from typing import Callable
 
-from jax import config
-config.update("jax_enable_x64", True)
-import jax.numpy as jnp
-
-from jaxtyping import Float
-
+from flax import nnx
 import gpjax as gpx
-from kohgpjax.kernel import KOHKernel
-from kohgpjax.posterior import KOHPosterior, construct_posterior
+from gpjax.dataset import Dataset
+from gpjax.typing import (
+    ScalarFloat,
+    # Array,
+)
+import jax.numpy as jnp
+from jaxtyping import (
+    Float, 
+    # Num,
+)
 
-class AbstractKOHModel:
-    def __init__(self, x, t, y):
-        self.x, self.t, self.y = x, t, y
-        self.num_field_obs = self.y.shape[0] - self.t.shape[0]
-        self.num_sim_obs = self.t.shape[0]
+from kohgpjax.dataset import KOHDataset
+from kohgpjax.gps import KOHPosterior, construct_posterior
+from kohgpjax.kernels.kohkernel import KOHKernel
 
-    ############## HANDLING DATA ##############
-    ###########################################
-
-    def dataset(self, theta) -> gpx.Dataset:
+class AbstractKOHModel(nnx.Module):
+    """
+    Abstract class for a KOH model.
+    """
+    def __init__(
+        self, 
+        kohdataset: KOHDataset
+    ):
         """
-        theta: jnp.ndarray
+        Parameters:
+        -----------
+        kohdataset: KOHDataset
+            The dataset containing the field and simulation observations.
         """
-        t = jnp.vstack((jnp.zeros((self.num_field_obs, self.t.shape[1])) + theta, self.t))
-        x = jnp.hstack((self.x, t), dtype=jnp.float64)
-        return gpx.Dataset(X=x, y=self.y)
+        self.kohdataset = kohdataset
     
     ############## GPJAX MODEL ##############
     #########################################
@@ -60,15 +66,15 @@ class AbstractKOHModel:
     
     @abstractmethod
     def k_epsilon_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
-        raise NotImplementedError
+        raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
     
     def GP_kernel(
         self,
         GPJAX_params
     ) -> gpx.kernels.AbstractKernel:        
         return KOHKernel(
-            num_field_obs = self.num_field_obs,
-            num_sim_obs = self.num_sim_obs,
+            num_field_obs = self.kohdataset.num_field_obs,
+            num_sim_obs = self.kohdataset.num_sim_obs,
             k_eta = self.k_eta(GPJAX_params),
             k_delta = self.k_delta(GPJAX_params),
             k_epsilon = self.k_epsilon(GPJAX_params),
@@ -85,10 +91,8 @@ class AbstractKOHModel:
             obs_stddev=obs_stddev
         )
     
-    def objective(self) -> gpx.objectives.AbstractObjective:
-        return gpx.objectives.ConjugateMLL(
-            negative=True
-        )
+    # def objective(self) -> Callable[[nnx.Module, Dataset], ScalarFloat]:
+    #     return gpx.objectives.conjugate_mll
     
     def GP_posterior(
         self,
@@ -99,8 +103,8 @@ class AbstractKOHModel:
             self.GP_kernel(GPJAX_params)
         )
         likelihood = self.likelihood(
-            num_datapoints=self.y.shape[0], 
-            obs_stddev=jnp.array(0.0) # This is defined in the kernel, hence 0 here.
+            num_datapoints=self.kohdataset.num_field_obs + self.kohdataset.num_sim_obs, 
+            obs_stddev=jnp.array(0.0) # This is defined in the kernel as field and sim are different, hence 0 here.
         )
         return construct_posterior(prior, likelihood)
     
@@ -117,15 +121,16 @@ class AbstractKOHModel:
 
     def get_KOH_neg_log_pos_dens_func(
             self,
-            transform_params_to_GPJAX: Callable[[list], list] = lambda x: x
+            transform_params_to_GPJAX: Callable[[list], list] = lambda x: x # TODO: Improve this workflow??
     ) -> Callable[..., Float]:
         """Returns a function which calculates the negative log density of the model.
         Note the first parameter argument must be the calibration parameters.
         """
         def neg_log_dens(MCMC_params):
             GPJAX_params = transform_params_to_GPJAX(MCMC_params)
-            return self.objective()(
-                self.GP_posterior(GPJAX_params), 
-                self.dataset(jnp.array(GPJAX_params[0]))
-            ) - self.KOH_log_prior(GPJAX_params)
+            return -gpx.objectives.conjugate_mll(
+                    self.GP_posterior(GPJAX_params), 
+                    # self.kohdataset.get_dataset(jnp.array(GPJAX_params[0]))
+                    self.kohdataset.get_dataset(GPJAX_params[0])
+                ) - self.KOH_log_prior(GPJAX_params)
         return neg_log_dens

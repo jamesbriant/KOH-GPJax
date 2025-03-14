@@ -5,17 +5,18 @@ requires = [ # Build requirements
 
 [project]
 name = "kohgpjax"  # Name of your package
-version = "0.0.1"  # Version of your package
+version = "0.1.0"  # Version of your package
 description = "Kennedy & O'Hagan Bayesian calibration framework written in JAX and GPJax"  # Description of your package
 authors = [ # List of authors
     {name="James Briant", email="james.briant.21@ucl.ac.uk"}
 ]
 dependencies = [ # Package requirements
+    "beartype",
+    "cola-ml",
+    "flax",
+    "gpjax>=0.9", 
     "jax", 
     "jaxtyping", 
-    "gpjax==0.8.2", 
-    "numpy",
-    "cola-ml",
 ]
 readme = "README.md"
 requires-python = ">=3.10"

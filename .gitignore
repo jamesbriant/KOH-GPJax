@@ -3,8 +3,7 @@ __pycache__
 build/
 
 kohgpjax.egg-info/
-
-data/timings/
+data/
 
 environment.yml
 *.npz

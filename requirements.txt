@@ -1,10 +1,6 @@
-numpy
+beartype
 cola-ml
+flax
+gpjax
 jax
 jaxtyping
-gpjax
-mici
-arviz
-matplotlib
-beartype
-ipykernel
