@@ -3,7 +3,6 @@ from typing import Callable
 
 from flax import nnx
 import gpjax as gpx
-from gpjax.dataset import Dataset
 from gpjax.typing import (
     ScalarFloat,
     # Array,
@@ -91,9 +90,6 @@ class AbstractKOHModel(nnx.Module):
             obs_stddev=obs_stddev
         )
     
-    # def objective(self) -> Callable[[nnx.Module, Dataset], ScalarFloat]:
-    #     return gpx.objectives.conjugate_mll
-    
     def GP_posterior(
         self,
         GPJAX_params,
@@ -128,7 +124,9 @@ class AbstractKOHModel(nnx.Module):
         """
         def neg_log_dens(MCMC_params):
             GPJAX_params = transform_params_to_GPJAX(MCMC_params)
-            return -gpx.objectives.conjugate_mll(
+            return gpx.objectives.ConjugateMLL(
+                    negative=True
+                )(
                     self.GP_posterior(GPJAX_params), 
                     # self.kohdataset.get_dataset(jnp.array(GPJAX_params[0]))
                     self.kohdataset.get_dataset(GPJAX_params[0])
