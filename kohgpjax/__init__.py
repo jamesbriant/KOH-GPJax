@@ -1,5 +1,5 @@
 from kohgpjax import (
-    base,
+    kohmodel,
     gps,
     kernels,
 )

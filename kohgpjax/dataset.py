@@ -6,8 +6,6 @@ import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class
 from jaxtyping import Num
 
-# from kohgpjax.typing import Dataset
-
 @dataclass
 @register_pytree_node_class
 class KOHDataset:

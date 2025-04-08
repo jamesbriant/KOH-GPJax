@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Callable
+from typing import Callable, Dict
 
 from flax import nnx
 import gpjax as gpx
@@ -13,25 +13,32 @@ from jaxtyping import (
     # Num,
 )
 
+
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import KOHPosterior, construct_posterior
 from kohgpjax.kernels.kohkernel import KOHKernel
+from kohgpjax.parameters import ModelParameters, SampleDict
 
-class AbstractKOHModel(nnx.Module):
+class KOHModel(nnx.Module):
     """
-    Abstract class for a KOH model.
+    Class for a KOH model.
     """
     def __init__(
-        self, 
+        self,
+        model_parameters: ModelParameters,
         kohdataset: KOHDataset
     ):
         """
         Parameters:
         -----------
+        model_parameters: CalibrationModelParameters
+            The model parameters for the KOH model.
         kohdataset: KOHDataset
             The dataset containing the field and simulation observations.
         """
+        self.model_parameters = model_parameters
         self.kohdataset = kohdataset
+
     
     ############## GPJAX MODEL ##############
     #########################################
@@ -52,32 +59,32 @@ class AbstractKOHModel(nnx.Module):
         )
     
     @abstractmethod
-    def k_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
+    def k_eta(self, GPJAX_params: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
     @abstractmethod
-    def k_delta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
+    def k_delta(self, GPJAX_params: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
     @abstractmethod
-    def k_epsilon(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
+    def k_epsilon(self, GPJAX_params: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
     @abstractmethod
-    def k_epsilon_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
+    def k_epsilon_eta(self, GPJAX_params: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
     
     def GP_kernel(
         self,
-        GPJAX_params
+        GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.kernels.AbstractKernel:        
         return KOHKernel(
             num_field_obs = self.kohdataset.num_field_obs,
             num_sim_obs = self.kohdataset.num_sim_obs,
-            k_eta = self.k_eta(GPJAX_params),
-            k_delta = self.k_delta(GPJAX_params),
-            k_epsilon = self.k_epsilon(GPJAX_params),
-            k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
+            k_eta = self.k_eta(GPJAX_params['eta']),
+            k_delta = self.k_delta(GPJAX_params['delta']),
+            k_epsilon = self.k_epsilon(GPJAX_params['epsilon']),
+            k_epsilon_eta = self.k_epsilon_eta(GPJAX_params['epsilon_eta']),
         )
 
     def likelihood(
@@ -108,27 +115,21 @@ class AbstractKOHModel(nnx.Module):
     ############## KOH MODEL ##############
     #######################################
 
-    @abstractmethod
-    def KOH_log_prior(
-        self,
-        GPJAX_params,
-    ) -> Float:
-        raise NotImplementedError
-
-    def get_KOH_neg_log_pos_dens_func(
-            self,
-            transform_params_to_GPJAX: Callable[[list], list] = lambda x: x # TODO: Improve this workflow??
-    ) -> Callable[..., Float]:
+    def get_KOH_neg_log_pos_dens_func(self) -> Callable[..., Float]:
         """Returns a function which calculates the negative log density of the model.
         Note the first parameter argument must be the calibration parameters.
         """
-        def neg_log_dens(MCMC_params):
-            GPJAX_params = transform_params_to_GPJAX(MCMC_params)
+        log_prior_func = self.model_parameters.get_log_prior_func()
+
+        def neg_log_dens(MCMC_params) -> Float:
+            constained_params = self.model_parameters.constrain_and_unflatten_sample(MCMC_params)
+            thetas = constained_params['thetas'] #TODO: This isn't ordered.
+
             return gpx.objectives.ConjugateMLL(
                     negative=True
                 )(
-                    self.GP_posterior(GPJAX_params), 
-                    # self.kohdataset.get_dataset(jnp.array(GPJAX_params[0]))
-                    self.kohdataset.get_dataset(GPJAX_params[0])
-                ) - self.KOH_log_prior(GPJAX_params)
+                    self.GP_posterior(constained_params),
+                    self.kohdataset.get_dataset(jnp.array(thetas['theta_0']).reshape(-1,1)), #TODO: THIS IS A TEMPORARY BODGE
+                ) - log_prior_func(MCMC_params)
+        
         return neg_log_dens

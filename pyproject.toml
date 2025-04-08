@@ -13,6 +13,7 @@ authors = [ # List of authors
 dependencies = [ # Package requirements
     "beartype",
     "cola-ml",
+    "distrax",
     "flax",
     "gpjax<0.9", 
     "jax", 
