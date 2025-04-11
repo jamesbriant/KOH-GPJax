@@ -41,104 +41,119 @@ import gpjax as gpx
 import jax.numpy as jnp
 from jaxtyping import Float
 
-from kohgpjax.base import AbstractKOHModel
+from kohgpjax.kohmodel import KOHModel
 
-class OurModel(AbstractKOHModel):
-    def k_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
-        thetas, ells, lambdas = GPJAX_params
+class Model(KOHModel):
+    def k_eta(self, eta_params_constrained) -> gpx.kernels.AbstractKernel:
         return gpx.kernels.ProductKernel(
             kernels=[
                 gpx.kernels.RBF(
                     active_dims=[0],
-                    lengthscale=jnp.array(ells[0]),
-                    variance=jnp.array(1/lambdas[0])
+                    lengthscale=jnp.array(eta_params_constrained['lengthscale']['x_0']),
+                    variance=jnp.array(1/eta_params_constrained['variance']),
                 ), 
                 gpx.kernels.RBF(
                     active_dims=[1],
-                    lengthscale=jnp.array(ells[1]),
+                    lengthscale=jnp.array(eta_params_constrained['lengthscale']['theta_0']),
                 )
             ]
         )
     
-    def k_delta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
-        thetas, ells, lambdas = GPJAX_params
+    def k_delta(self, delta_params_constrained) -> gpx.kernels.AbstractKernel:
         return gpx.kernels.RBF(
-                active_dims=[0],
-                lengthscale=jnp.array(ells[2]),
-                variance=jnp.array(1/lambdas[1])
-            )
+            active_dims=[0],
+            lengthscale=jnp.array(delta_params_constrained['lengthscale']['x_0']),
+            variance=jnp.array(1/delta_params_constrained['variance']),
+        )
     
-    def k_epsilon(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
-        thetas, ells, lambdas = GPJAX_params
+    def k_epsilon(self, epsilon_params_constrained) -> gpx.kernels.AbstractKernel:
         return gpx.kernels.White(
-                active_dims=[0],
-                variance=jnp.array(1/lambdas[2])
-            )
+            active_dims=[0],
+            variance=jnp.array(1/epsilon_params_constrained['variance']),
+        )
     
-    def k_epsilon_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
-        thetas, ells, lambdas = GPJAX_params
+    def k_epsilon_eta(self, epsilon_eta_params_constrained) -> gpx.kernels.AbstractKernel:
         return gpx.kernels.White(
-                active_dims=[0],
-                variance=jnp.array(1/lambdas[3])
-            )
-
-    def KOH_log_prior(
-        self,
-        GPJAX_params,
-    ) -> Float:
-        thetas, ells, lambdas = GPJAX_params
-
-        ####### ell #######
-        # lengthscale parameters
-        # EXAMPLE: ell_eta_0 ~ GAM(4,1.4) where 2nd param is rate
-        logprior = (4-1)*jnp.log(ells[0]) - 1.4*ells[0]
-
-        # Prior for ell_eta_1 ~ GAM(2,3.5) where 2nd param is rate
-        logprior += (2-1)*jnp.log(ells[1]) - 3.5*ells[1]
-
-        # Prior for ell_delta_0 ~ GAM(4,2) where 2nd param is rate
-        logprior += (4-1)*jnp.log(ells[2]) - 2*ells[2]
-
-
-        ####### lambda #######
-        # variance parameters
-        # EXAMPLE: lambda_eta ~ GAM(2,4) where 2nd param is rate
-        logprior += (2-1)*jnp.log(lambdas[0]) - 4*lambdas[0]
-
-        # EXAMPLE: lambda_b ~ GAM(2,0.1) where 2nd param is rate
-        logprior += (2-1)*jnp.log(lambdas[1]) - 0.1*lambdas[1]
-
-        # EXAMPLE: lambda_e ~ GAM(12,0.025) where 2nd param is rate
-        logprior += (12-1)*jnp.log(lambdas[2]) - 0.025*lambdas[2]
-
-        # EXAMPLE: lambda_en ~ GAM(10,0.001) where 2nd param is rate
-        logprior += (10-1)*jnp.log(lambdas[3]) - 0.001*lambdas[3]
-
-        return logprior
+            active_dims=[0],
+            variance=jnp.array(1/epsilon_eta_params_constrained['variance'])
+        )
 ```
 
-We also need to develop a function which will transform the parameters from our optimiser/MCMC/VI scheme to the constrained domain expected by GPJax. For example, many MCMC methods assume parameter operate on the real line, but we require both our lengthscale and variance parameters of our kernels to be strictly positive.
+Next we need to define the prior distributions and bijectors for each model parameter. This is accomplished using a dictionary as follows.
 
 ```python3
-param_transform_mici_to_gpjax = lambda x: [
-    [ # theta (calibration) parameters
-        mapRto01(x[0]),
-    ],
-    [ # lengthscale parameters
-        mapRto0inf(x[1]), 
-        mapRto0inf(x[2]), 
-        mapRto0inf(x[3]),
-    ],
-    [ # lambda (variance) parameters
-        mapRto0inf(x[4]), 
-        mapRto0inf(x[5]), 
-        mapRto0inf(x[6]), 
-        mapRto0inf(x[7]),
-    ]
-]
+import distrax
+import jax.numpy as jnp
+
+from kohgpjax.parameters import (
+    ParameterPrior,
+    PriorDict,
+)
+
+def map01toR(theta) -> Float:
+    return jnp.log(-1+1/theta)
+
+def map0inftoR(theta) -> Float:
+    return jnp.log(theta)
+
+map01toR_distrax = distrax.Lambda(
+    lambda x: map01toR(x)
+)
+map0inftoR_distrax = distrax.Lambda(
+    lambda x: map0inftoR(x)
+)
+
+prior_dict: PriorDict = {
+    'thetas': {
+        'theta_0': ParameterPrior(
+            distrax.Uniform(low=0.0, high=1.0),
+            map01toR_distrax,
+        ),
+    },
+    'eta': {
+        'variance': ParameterPrior(
+            distrax.Gamma(concentration=2.0, rate=4.0), 
+            map0inftoR_distrax,
+        ),
+        'lengthscale': {
+            'x_0': ParameterPrior(
+                distrax.Gamma(concentration=4.0, rate=1.4),
+                map0inftoR_distrax,
+            ),
+            'theta_0': ParameterPrior(
+                distrax.Gamma(concentration=2.0, rate=3.5),
+                map0inftoR_distrax,
+            ),
+        },
+    },
+    'delta': {
+        'variance': ParameterPrior(
+            distrax.Gamma(concentration=2.0, rate=0.1),
+            map0inftoR_distrax,
+        ),
+        'lengthscale': {
+            'x_0': ParameterPrior(
+                distrax.Gamma(concentration=4.0, rate=2.0),
+                map0inftoR_distrax,
+            ),
+        },
+    },
+    'epsilon': {
+        'variance': ParameterPrior(
+            distrax.Gamma(concentration=12.0, rate=0.025),
+            map0inftoR_distrax,
+        ),
+    },
+    'epsilon_eta': { #TODO: make this optional
+        'variance': ParameterPrior(
+            distrax.Gamma(concentration=10.0, rate=0.001),
+            map0inftoR_distrax,
+        ),
+    },
+}
 ```
 
-Finally, we import `OurModel()`, provide the data and retrieve the negative log posterior density function. This function can be provided directly to your optimiser/MCMC/VI method.
+Finally, we import `OurModel()`, provide the data and retrieve the negative log posterior density function. This function can be provided directly to your MCMC method.
 
 ```python3
 from jax import config
@@ -151,32 +166,47 @@ import kohgpjax as kgx
 
 from models.ourmodel import OurModel
 
-# Import the data however you see fit.
-dataloader = DataLoader('data/toy/field.csv', 'data/toy/sim.csv')
-data = dataloader.get_data()
-model = KOHmodel.Model(*data)
+###### LOAD DATA ######
+DATAFIELD = np.loadtxt('data/field.csv', delimiter=',', dtype=np.float32)
+DATACOMP = np.loadtxt('data/comp.csv', delimiter=',', dtype=np.float32)
 
-nlpd_func = model.get_KOH_neg_log_pos_dens_func(
-    param_transform_mici_to_gpjax
+xf = jnp.reshape(DATAFIELD[:, 0], (-1, 1)).astype(jnp.float64)
+xc = jnp.reshape(DATACOMP[:, 0], (-1,1)).astype(jnp.float64)
+tc = jnp.reshape(DATACOMP[:, 1], (-1,1)).astype(jnp.float64)
+yf = jnp.reshape(DATAFIELD[:, 1], (-1,1)).astype(jnp.float64)
+yc = jnp.reshape(DATACOMP[:, 2], (-1,1)).astype(jnp.float64)
+
+tmin = jnp.min(tc)
+tmax = jnp.max(tc)
+tc_normalized = (tc - tmin)/(tmax - tmin)
+
+field_dataset = gpx.Dataset(xf, yf)
+comp_dataset = gpx.Dataset(jnp.hstack((xc, tc_normalized)), yc)
+
+kohdataset = kgx.KOHDataset(field_dataset, comp_dataset)
+
+
+###### Create Model Instance and JIT ######
+model = Model(
+    model_parameters=kgx.ModelParameters(prior_dict=prior_dict),
+    kohdataset=kohdataset,
 )
 
-# You can jax.jit and jax.grad this function!
-nlpd_jit = jit(nlpd_func)
+nlpd_jit = jax.jit(
+    model.get_KOH_neg_log_pos_dens_func()
+)
 
-x_test = jnp.array([
-    0.5,        # theta
-    1.0,        # ell_eta_0
-    0.3,        # ell_eta_1
-    1.0,        # ell_delta_0
-    1.0,        # lambda_eta
-    30.0,       # lambda_delta
-    400.0,      # lambda_epsilon
-    10000.0,    # lambda_epsilon_eta
-])
+###### TEST ######
+prior_leaves, prior_tree = jax.tree.flatten(prior_dict)
+prior_means = jax.tree.map(
+    lambda x: x.forward(x.distribution.mean()), prior_leaves
+)
+x_test = jnp.array(prior_means)
+
 nlpd_jit(x_test)
 ```
 
-Visit my [BayesianCalibrationExamples](https://github.com/jamesbriant/BayesianCalibrationExamples) repository for many examples using this package.
+Visit my [BayesianCalibrationExamples](https://github.com/jamesbriant/BayesianCalibrationExamples/) repository for many examples using this package.
 
 ## To-Do
 
@@ -185,8 +215,8 @@ Very vague outline of this project:
 - [x] Create a modular KOH kernel class
 - [x] Build a posterior class
 - [x] Add KOHDataset class
-- [ ] Improve the data flow within the AbstractKOHModel class.
-- [ ] Standardise `GPJAX_params`.
+- [x] Improve the data flow within the AbstractKOHModel class.
+- [x] Standardise `GPJAX_params`.
 
 ## References
 
