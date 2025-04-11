@@ -7,6 +7,7 @@ from gpjax.typing import (
     ScalarFloat,
     # Array,
 )
+import jax
 import jax.numpy as jnp
 from jaxtyping import (
     Float, 
@@ -119,17 +120,25 @@ class KOHModel(nnx.Module):
         """Returns a function which calculates the negative log density of the model.
         Note the first parameter argument must be the calibration parameters.
         """
+        neg_log_like_func = gpx.objectives.ConjugateMLL(
+            negative=True
+        )
         log_prior_func = self.model_parameters.get_log_prior_func()
 
-        def neg_log_dens(MCMC_params) -> Float:
-            constained_params = self.model_parameters.constrain_and_unflatten_sample(MCMC_params)
-            thetas = constained_params['thetas'] #TODO: This isn't ordered.
+        def neg_log_dens(params_unconstrained_flat) -> Float:
+            params_unconstrained_flat_list = [x for x in params_unconstrained_flat]
+            params_constrained = self.model_parameters.constrain_and_unflatten_sample(params_unconstrained_flat)
 
-            return gpx.objectives.ConjugateMLL(
-                    negative=True
-                )(
-                    self.GP_posterior(constained_params),
-                    self.kohdataset.get_dataset(jnp.array(thetas['theta_0']).reshape(-1,1)), #TODO: THIS IS A TEMPORARY BODGE
-                ) - log_prior_func(MCMC_params)
+            # thetas_list needs to maintain the correct order!
+            thetas_list = [params_constrained['thetas'][f"theta_{i}"] for i in range(self.kohdataset.num_calib_params)]
+            dataset = self.kohdataset.get_dataset(jnp.array(thetas_list).reshape(-1,1))
+
+            neg_log_like = neg_log_like_func(
+                self.GP_posterior(params_constrained),
+                dataset
+            )
+            log_prior = log_prior_func(params_unconstrained_flat_list)
+
+            return neg_log_like - log_prior
         
         return neg_log_dens
