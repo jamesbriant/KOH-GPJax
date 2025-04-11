@@ -93,38 +93,16 @@ class ModelParameters:
             lambda dist: jax.jit(dist.log_prob),
             self.priors_flat
         )
-
-    #TODO: uncomment when/if neccessary
-    # def sample_prior(self, key):
-    #     return jax.tree_util.tree_map(lambda dist, subkey: dist.sample(seed=subkey),
-    #                                   self.priors,
-    #                                   jax.random.split(key, jax.tree_util.tree_leaves(self.priors)))
-
-    #TODO: uncomment when/if neccessary
-    # def unconstrain(self, constrained_params_flat):
-    #     """
-    #     Transform constrained parameters to unconstrained space.
-    #     Args:
-    #         constrained_params_flat: A flat array of constrained parameters.
-    #     Returns:
-    #         A flat array of unconstrained parameters.
-    #     """
-    #     pass
     
-    def constrain_sample(self, samples_flat) -> List[Float]:
+    def constrain_sample(self, samples_flat):
         """
         Transform samples to the constrained space.
         Args:
-            samples_flat: A flat array of samples.
+            samples_flat: A flat JAX array of samples.
         Returns:
             A tree of samples in the constrained space.
         """
-        # Constrain the samples to the constrained space
-        return jax.tree.map(
-            lambda param_prior, x: param_prior.inverse(x),
-            self.priors_flat,
-            samples_flat
-        )
+        return [prior.inverse(samples_flat[i]) for i, prior in enumerate(self.priors_flat)]
 
     def unflatten_sample(self, samples_flat) -> SampleDict:
         """
@@ -157,27 +135,22 @@ class ModelParameters:
             A function that computes the joint log prior probability.
         """
         @jax.jit
-        def log_prior_func(constrained_params_flat: List) -> Float:
+        def log_prior_func(unconstrained_params_flat: List) -> Float:
+            """
+            Compute the joint log prior probability.
+            Args:
+                unconstrained_params_flat: A flat array of unconstrained parameters.
+            Returns:
+                The joint log prior probability.
+            """
             log_probs = jax.tree.map(
                 lambda log_prob_func, x: log_prob_func(x),
                 self.prior_log_prob_funcs,
-                constrained_params_flat
+                unconstrained_params_flat
             )
             return jnp.sum(jnp.concatenate([jnp.atleast_1d(x) for x in log_probs]))
         
         return log_prior_func
-    
-    # def get_kernel_parameters(self, ):
-    #     pass
-
-    # def get_unconstrained_shape(self):
-    #     leaves = jax.tree_util.tree_leaves(self.priors)
-    #     total_params = 0
-    #     for leaf in leaves:
-    #         # Get the shape of a sample from the distribution
-    #         sample_shape = jnp.shape(leaf.sample(seed=jax.random.PRNGKey(0)))
-    #         total_params += jnp.prod(jnp.array(sample_shape))
-    #     return int(total_params)
     
 
 def _check_prior_dict(params_prior_dict: PriorDict):
