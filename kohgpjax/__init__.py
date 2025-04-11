@@ -4,6 +4,7 @@ from kohgpjax import (
     kernels,
 )
 from kohgpjax.dataset import KOHDataset
+from kohgpjax.parameters import ModelParameters, ParameterPrior
 
 __description__ = "Bayesian calibration from Kennedy & O'Hagan (2001) implementation in GPJax"
 __url__ = "https://github.com/jamesbriant/KOH-GPJax"
