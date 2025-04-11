@@ -82,8 +82,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         test_inputs: Num[Array, "N D"],
         train_data: Dataset,
     ) -> GaussianDistribution:
-        print("Use predict_eta(), predict_zeta() or predict_obs() methods instead.")
-        raise NotImplementedError
+        raise NotImplementedError("Use predict_eta(), predict_zeta() or predict_obs() methods instead.")
 
     def predict_eta(
         self,
