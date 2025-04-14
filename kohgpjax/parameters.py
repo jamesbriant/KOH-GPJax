@@ -7,16 +7,18 @@ from typing import Callable, Dict, List, Union
 
 class ParameterPrior:
     def __init__(
-        self, 
+        self,
         distribution: distrax.Distribution, 
         bijector: distrax.Bijector,
         invert_bijector: bool = False,
+        name: str = None,
     ):
         """
         Args:
             distribution: A distrax.Distribution object representing the prior distribution.
             bijector: A distrax.Bijector object representing the transformation to the unconstrained space.
             invert_bijector: If True, the bijector is inverted.
+            name: Optional name for the prior.
         """
         if not isinstance(distribution, distrax.Distribution):
             raise ValueError("distribution must be a distrax.Distribution object.")
@@ -27,6 +29,7 @@ class ParameterPrior:
         self.bijector = bijector
         if invert_bijector:
             self.bijector = distrax.Inverse(self.bijector)
+        self.name = name
 
     def forward(self, x):
         return self.bijector.forward(x)
