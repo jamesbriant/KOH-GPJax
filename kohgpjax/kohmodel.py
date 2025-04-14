@@ -3,17 +3,10 @@ from typing import Callable, Dict
 
 from flax import nnx
 import gpjax as gpx
-from gpjax.typing import (
-    ScalarFloat,
-    # Array,
-)
-import jax
 import jax.numpy as jnp
 from jaxtyping import (
-    Float, 
-    # Num,
+    Float,
 )
-
 
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import KOHPosterior, construct_posterior
