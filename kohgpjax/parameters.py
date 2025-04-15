@@ -156,39 +156,36 @@ class ModelParameters:
         return log_prior_func
     
 
-def _check_prior_dict(params_prior_dict: PriorDict):
+def _check_prior_dict(prior_dict: PriorDict):
     """
     Check if the kernel config is valid.
     """
     # Check if the kernel config has the correct keys
     #TODO: make 'epsilon_eta' optional
-    if not set(['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']).issubset(list(params_prior_dict.keys())):
-        raise ValueError("params_prior_dict keys must contain ['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']")
+    if not set(['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']).issubset(list(prior_dict.keys())):
+        raise ValueError("prior_dict keys must contain ['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']")
     
     # Check if each kernel has the required keys
-    for key, param_prior_dict in params_prior_dict.items():
-        if key != 'thetas':
-            if 'variance' not in param_prior_dict:
-                raise KeyError(f"params_prior_dict key '{key}' must contain 'variance'")
-            
-            if not isinstance(param_prior_dict['variance'], ParameterPrior):
-                raise ValueError(f"params_prior_dict['{key}']['variance'] must be a ParameterPrior instance.")
-        
-            for param_type in ['lengthscale', 'period']: # Add other types as needed
-                if param_type in param_prior_dict:
-                    if not isinstance(param_prior_dict[param_type], dict):
-                        raise ValueError(f"params_prior_dict['{key}']['{param_type}'] must be a dictionary.")
-                    
-                    for sub_param_name, sub_param_item in param_prior_dict[param_type].items():
-                        if not isinstance(sub_param_item, ParameterPrior):
-                            raise ValueError(f"params_prior_dict['{key}']['{param_type}']['{sub_param_name}'] must be a ParameterPrior instance.")
-        
+    for key, param_prior_dict in prior_dict.items():
         if key == 'thetas':
             if not isinstance(param_prior_dict, dict):
-                raise ValueError(f"params_prior_dict['{key}'] must be a dictionary.")
+                raise ValueError(f"prior_dict['{key}'] must be a dictionary of ParameterPrior instances.")
             for sub_param_name, sub_param_item in param_prior_dict.items():
                 if not isinstance(sub_param_item, ParameterPrior):
-                    raise ValueError(f"params_prior_dict['thetas']['{sub_param_name}'] must be a ParameterPrior instance.")
+                    raise ValueError(f"prior_dict['thetas']['{sub_param_name}'] must be a ParameterPrior instance.")
+                
+        else:
+            if 'variances' not in param_prior_dict:
+                raise KeyError(f"prior_dict key '{key}' must contain 'variances' key with dictionary of ParameterPrior instances.")
+
+            for sub_param_type, sub_param_dict in param_prior_dict.items():
+                if not isinstance(sub_param_dict, dict):
+                    raise ValueError(f"prior_dict['{key}']['{sub_param_type}'] must be a dictionary of ParameterPrior instances.")
+                
+                for sub_param_type_name, param_prior in sub_param_dict.items():
+                    if not isinstance(param_prior, ParameterPrior):
+                        raise ValueError(f"prior_dict['{key}']['{sub_param_type}']['{sub_param_type_name}'] must be a ParameterPrior instance.")
+        
 
         #TODO: add checks for parameters depending on the AbstractKernel class.
         # e.g. if kernel_item['kernel'] is RBF, check that lengthscale is a distrax.Distribution
