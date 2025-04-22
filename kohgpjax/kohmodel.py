@@ -93,8 +93,15 @@ class KOHModel(nnx.Module):
     
     def GP_posterior(
         self,
-        GPJAX_params,
+        GPJAX_params: Dict,
     ) -> KOHPosterior:
+        """
+        Constructs the GP posterior using the GPJAX parameters.
+        Args:
+            GPJAX_params: The GPJAX parameters in the same shape as prior_dict.
+        Returns:
+            A KOHPosterior object.
+        """
         prior = self.GP_prior(
             self.GP_prior_mean_function(), 
             self.GP_kernel(GPJAX_params)
