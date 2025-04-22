@@ -47,6 +47,4 @@ class KOHKernel(AbstractKernel):
         Returns:
             Float: The value of $`k(x, y)`$.
         """
-        print("It is no obvious how to compute the kernel value for this kernel.")
-        print("Instead calculate the desired value by calling one of the components (or subkernels) of this class.")
-        raise NotImplementedError
+        raise NotImplementedError("It is no obvious how to compute the kernel value for this kernel. Instead calculate the desired value by calling one of the components (or subkernels) of this class.")
