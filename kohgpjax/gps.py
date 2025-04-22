@@ -1,41 +1,41 @@
-# Copyright 2022 The GPJax Contributors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+import beartype.typing as tp
 
-from dataclasses import dataclass
-
-import cola
-import jax.numpy as jnp
-from jaxtyping import (
-    Num,
-)
+from cola.annotations import PSD
+from cola.linalg.inverse.inv import solve
+from cola.ops.operators import I_like
 
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
+from gpjax.gps import (
+    AbstractPrior,
+    AbstractPosterior,
+    ConjugatePosterior,
+    NonConjugatePosterior,
+)
+from gpjax.kernels.base import AbstractKernel
 from gpjax.likelihoods import (
+    AbstractLikelihood,
     Gaussian,
+    NonGaussian,
 )
-from gpjax.typing import (
-    Array,
-)
+from gpjax.mean_functions import AbstractMeanFunction
+from gpjax.typing import Array
 
-from kohgpjax.kernel import KOHKernel
-from gpjax.gps import *
+import jax.numpy as jnp
+from jaxtyping import Num
+
+from kohgpjax.kernels.kohkernel import KOHKernel
+
+K = tp.TypeVar("K", bound=AbstractKernel)
+M = tp.TypeVar("M", bound=AbstractMeanFunction)
+P = tp.TypeVar("P", bound=AbstractPrior)
+PKOH = tp.TypeVar("PKOH", bound=KOHKernel)
+L = tp.TypeVar("L", bound=AbstractLikelihood)
+NGL = tp.TypeVar("NGL", bound=NonGaussian)
+GL = tp.TypeVar("GL", bound=Gaussian)
 
 
-@dataclass
-class KOHPosterior(AbstractPosterior):
+class KOHPosterior(AbstractPosterior[PKOH, GL]):
     r"""A Conjuate Gaussian process posterior object.
 
     A Gaussian process posterior distribution when the constituent likelihood
@@ -82,8 +82,7 @@ class KOHPosterior(AbstractPosterior):
         test_inputs: Num[Array, "N D"],
         train_data: Dataset,
     ) -> GaussianDistribution:
-        print("Use predict_eta() or predict_obs() methods instead.")
-        raise NotImplementedError
+        raise NotImplementedError("Use predict_eta(), predict_zeta() or predict_obs() methods instead.")
 
     def predict_eta(
         self,
@@ -148,7 +147,7 @@ class KOHPosterior(AbstractPosterior):
         # n_pred = t.shape[0]
 
         # Observation noise o²
-        # obs_noise = self.likelihood.obs_stddev**2 # No longer used as already implemented into kernel
+        # obs_noise = self.likelihood.obs_stddev.value**2 # No longer used as already implemented into kernel
         mx = self.prior.mean_function(x)
 
         ###### NEW METHOD ######
@@ -156,35 +155,27 @@ class KOHPosterior(AbstractPosterior):
         x_stack = jnp.vstack((x, t))
 
         # compute the cross-covariance matrix
-        K = self.prior.kernel.cross_covariance(x_stack, x_stack)
-        Kxx = cola.PSD(
-            cola.ops.Dense(
-                K[:n_train, :n_train]
-            )
-        )
+        K = self.prior.kernel.cross_covariance(x_stack, x_stack) # need array, not the cola linear operator so use cross_covariance() method not gram() method
+        Kxx = PSD(K[:n_train, :n_train])
         Kxt = K[:n_train, n_train:]
-        Ktt = cola.PSD(
-            cola.ops.Dense(
-                K[n_train:, n_train:]
-            )
-        )
+        Ktt = PSD(K[n_train:, n_train:])
 
-        Kxx += cola.ops.I_like(Kxx) * self.jitter
+        Kxx += I_like(Kxx) * self.jitter
 
         # Σ = Kxx + Io²
         Sigma = Kxx #+ cola.ops.I_like(Kxx) * obs_noise
-        Sigma = cola.PSD(Sigma)
+        Sigma = PSD(Sigma)
 
         mean_t = self.prior.mean_function(t)
-        Sigma_inv_Kxt = cola.solve(Sigma, Kxt)
+        Sigma_inv_Kxt = solve(Sigma, Kxt) # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
         mean = mean_t + jnp.matmul(Sigma_inv_Kxt.T, y - mx)
 
         # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
         covariance = Ktt - jnp.matmul(Kxt.T, Sigma_inv_Kxt)
-        covariance += cola.ops.I_like(covariance) * self.prior.jitter
-        covariance = cola.PSD(covariance)
+        covariance += I_like(covariance) * self.prior.jitter
+        covariance = PSD(covariance)
 
         return GaussianDistribution(jnp.atleast_1d(mean.squeeze()), covariance)
 
@@ -314,7 +305,7 @@ class KOHPosterior(AbstractPosterior):
         # n_pred = t.shape[0]
 
         # Observation noise o²
-        # obs_noise = self.likelihood.obs_stddev**2 # No longer used as already implemented into kernel
+        # obs_noise = self.likelihood.obs_stddev.value**2 # No longer used as already implemented into kernel
         mx = self.prior.mean_function(x)
 
         # Calculate bias terms for prediction
@@ -328,36 +319,28 @@ class KOHPosterior(AbstractPosterior):
         # compute the cross-covariance matrix
         K = self.prior.kernel.cross_covariance(x_stack, x_stack)
 
-        Kxx = cola.PSD(
-            cola.ops.Dense(
-                K[:n_train, :n_train]
-            )
-        )
+        Kxx = PSD(K[:n_train, :n_train])
         Kxt = K[:n_train, n_train:] + jnp.pad(Kddpred, ((0, x.shape[0]-num_field_obs), (0, 0)))
-        Ktt = cola.PSD(
-            cola.ops.Dense(
-                K[n_train:, n_train:] + Kdpreddpred
-            )
-        )
-        if include_observation_noise:
+        Ktt = PSD(K[n_train:, n_train:] + Kdpreddpred)
+        if include_observation_noise: # This cannot be jitted. TODO: Find a way to make this jittable.
             Ktt += self.prior.kernel.k_epsilon.cross_covariance(t, t)
 
-        Kxx += cola.ops.I_like(Kxx) * self.jitter
+        Kxx += I_like(Kxx) * self.jitter
 
         # Σ = Kxx + Io²
         Sigma = Kxx #+ cola.ops.I_like(Kxx) * obs_noise
-        Sigma = cola.PSD(Sigma)
+        Sigma = PSD(Sigma)
 
         mean_t = self.prior.mean_function(t)
-        Sigma_inv_Kxt = cola.solve(Sigma, Kxt)
+        Sigma_inv_Kxt = solve(Sigma, Kxt) # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
         mean = mean_t + jnp.matmul(Sigma_inv_Kxt.T, y - mx)
 
         # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
         covariance = Ktt - jnp.matmul(Kxt.T, Sigma_inv_Kxt)
-        covariance += cola.ops.I_like(covariance) * self.prior.jitter
-        covariance = cola.PSD(covariance)
+        covariance += I_like(covariance) * self.prior.jitter
+        covariance = PSD(covariance)
 
         return GaussianDistribution(jnp.atleast_1d(mean.squeeze()), covariance)
 
@@ -366,6 +349,21 @@ class KOHPosterior(AbstractPosterior):
 #######################
 # Utils
 #######################
+
+@tp.overload
+def construct_posterior(prior: P, likelihood: GL) -> ConjugatePosterior[P, GL]: ...
+
+
+@tp.overload
+def construct_posterior(  # noqa: F811
+    prior: P, likelihood: NGL
+) -> NonConjugatePosterior[P, NGL]: ...
+
+@tp.overload
+def construct_posterior(
+    prior: PKOH, likelihood: GL
+) -> KOHPosterior[PKOH, GL]: ...
+
 
 def construct_posterior(prior, likelihood):
     r"""Utility function for constructing a posterior object from a prior and
