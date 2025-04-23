@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from jaxtyping import (
     Float,
 )
+from jax.experimental import checkify
 
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import KOHPosterior, construct_posterior
@@ -84,7 +85,7 @@ class KOHModel(nnx.Module):
     def likelihood(
         self,
         num_datapoints, 
-        obs_stddev=jnp.array(0.0)
+        obs_stddev
     ) -> gpx.likelihoods.AbstractLikelihood:
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
@@ -117,15 +118,12 @@ class KOHModel(nnx.Module):
     #######################################
 
     def get_KOH_neg_log_pos_dens_func(self) -> Callable[..., Float]:
-        """Returns a function which calculates the negative log density of the model.
-        Note the first parameter argument must be the calibration parameters.
+        """Returns a function which calculates the negative log posterior density of the model.
         """
-        neg_log_like_func = gpx.objectives.ConjugateMLL(
-            negative=True
-        )
+        log_like_func = gpx.objectives.conjugate_mll
         log_prior_func = self.model_parameters.get_log_prior_func()
 
-        def neg_log_dens(params_unconstrained_flat) -> Float:
+        def neg_log_pos_dens(params_unconstrained_flat) -> Float:
             params_unconstrained_flat_list = [x for x in params_unconstrained_flat]
             params_constrained = self.model_parameters.constrain_and_unflatten_sample(params_unconstrained_flat)
 
@@ -133,12 +131,16 @@ class KOHModel(nnx.Module):
             thetas_list = [params_constrained['thetas'][f"theta_{i}"] for i in range(self.kohdataset.num_calib_params)]
             dataset = self.kohdataset.get_dataset(jnp.array(thetas_list).reshape(-1,1))
 
-            neg_log_like = neg_log_like_func(
+            neg_log_like = -log_like_func(
                 self.GP_posterior(params_constrained),
                 dataset
             )
             log_prior = log_prior_func(params_unconstrained_flat_list)
 
             return neg_log_like - log_prior
+
+        def nlpd_checkified(params_unconstrained_flat) -> Float:
+            error, value = checkify.checkify(neg_log_pos_dens)(params_unconstrained_flat)
+            return value
         
-        return neg_log_dens
+        return nlpd_checkified
