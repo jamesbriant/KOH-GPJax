@@ -2,6 +2,7 @@ import beartype.typing as tp
 
 from cola.annotations import PSD
 from cola.linalg.inverse.inv import solve
+from cola.ops import Dense
 from cola.ops.operators import I_like
 
 from gpjax.dataset import Dataset
@@ -141,13 +142,13 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         # Unpack training data
         x, y = train_data.X, train_data.y
         n_train = x.shape[0]
+        n_obs = self.prior.kernel.num_field_obs
 
         # Unpack test inputs
         t = test_inputs
-        # n_pred = t.shape[0]
 
         # Observation noise o²
-        # obs_noise = self.likelihood.obs_stddev.value**2 # No longer used as already implemented into kernel
+        obs_noise = self.likelihood.obs_stddev.value**2
         mx = self.prior.mean_function(x)
 
         ###### NEW METHOD ######
@@ -156,23 +157,26 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
 
         # compute the cross-covariance matrix
         K = self.prior.kernel.cross_covariance(x_stack, x_stack) # need array, not the cola linear operator so use cross_covariance() method not gram() method
-        Kxx = PSD(K[:n_train, :n_train])
+        Kxx = K[:n_train, :n_train]
         Kxt = K[:n_train, n_train:]
-        Ktt = PSD(K[n_train:, n_train:])
+        Ktt = PSD(Dense(K[n_train:, n_train:]))
 
-        Kxx += I_like(Kxx) * self.jitter
-
-        # Σ = Kxx + Io²
-        Sigma = Kxx #+ cola.ops.I_like(Kxx) * obs_noise
-        Sigma = PSD(Sigma)
-
-        mean_t = self.prior.mean_function(t)
+        # Σ = Kxx + Io²        
+        Kxx += jnp.diag(
+            jnp.pad(
+                jnp.ones(n_obs) * obs_noise,
+                (0, x.shape[0]-n_obs),
+            )
+        )
+        Kxx += jnp.identity(Kxx.shape[0]) * self.jitter
+        Sigma = PSD(Dense(Kxx))
         Sigma_inv_Kxt = solve(Sigma, Kxt) # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
+        mean_t = self.prior.mean_function(t)
         mean = mean_t + jnp.matmul(Sigma_inv_Kxt.T, y - mx)
 
-        # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
+        # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, #TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
         covariance = Ktt - jnp.matmul(Kxt.T, Sigma_inv_Kxt)
         covariance += I_like(covariance) * self.prior.jitter
         covariance = PSD(covariance)
@@ -299,13 +303,13 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         # Unpack training data
         x, y = train_data.X, train_data.y
         n_train = x.shape[0]
+        n_obs = self.prior.kernel.num_field_obs
 
         # Unpack test inputs
         t = test_inputs
-        # n_pred = t.shape[0]
 
         # Observation noise o²
-        # obs_noise = self.likelihood.obs_stddev.value**2 # No longer used as already implemented into kernel
+        obs_noise = self.likelihood.obs_stddev.value**2
         mx = self.prior.mean_function(x)
 
         # Calculate bias terms for prediction
@@ -319,25 +323,29 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         # compute the cross-covariance matrix
         K = self.prior.kernel.cross_covariance(x_stack, x_stack)
 
-        Kxx = PSD(K[:n_train, :n_train])
+        Kxx = K[:n_train, :n_train]
         Kxt = K[:n_train, n_train:] + jnp.pad(Kddpred, ((0, x.shape[0]-num_field_obs), (0, 0)))
-        Ktt = PSD(K[n_train:, n_train:] + Kdpreddpred)
-        if include_observation_noise: # This cannot be jitted. TODO: Find a way to make this jittable.
-            Ktt += self.prior.kernel.k_epsilon.cross_covariance(t, t)
-
-        Kxx += I_like(Kxx) * self.jitter
+        Ktt = K[n_train:, n_train:] + Kdpreddpred
+        if include_observation_noise: # This cannot be jitted. #TODO: Find a way to make this jittable.
+            Ktt += jnp.identity(Ktt.shape[0]) * obs_noise
+        Ktt = PSD(Dense(Ktt))
 
         # Σ = Kxx + Io²
-        Sigma = Kxx #+ cola.ops.I_like(Kxx) * obs_noise
-        Sigma = PSD(Sigma)
-
-        mean_t = self.prior.mean_function(t)
+        Kxx += jnp.diag(
+            jnp.pad(
+                jnp.ones(n_obs) * obs_noise,
+                (0, x.shape[0]-n_obs),
+            )
+        )
+        Kxx += jnp.identity(Kxx.shape[0]) * self.jitter
+        Sigma = PSD(Dense(Kxx))
         Sigma_inv_Kxt = solve(Sigma, Kxt) # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
+        mean_t = self.prior.mean_function(t)
         mean = mean_t + jnp.matmul(Sigma_inv_Kxt.T, y - mx)
 
-        # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
+        # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, #TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
         covariance = Ktt - jnp.matmul(Kxt.T, Sigma_inv_Kxt)
         covariance += I_like(covariance) * self.prior.jitter
         covariance = PSD(covariance)
