@@ -33,10 +33,9 @@ class KOHKernelComputation(AbstractKernelComputation):
         # PART 2 - Construct the cross-covariance sub-matrices
         sigma_eta = kernel.k_eta.cross_covariance(x, y)
         sigma_delta = kernel.k_delta.cross_covariance(x_field, y_field)
-        sigma_epsilon = kernel.k_epsilon.cross_covariance(x_field, y_field)
         sigma_epsilon_eta = kernel.k_epsilon_eta.cross_covariance(x_sim, y_sim)
 
-        return sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta
+        return sigma_eta, sigma_delta, sigma_epsilon_eta
 
 
     # def _cross_covariance( #TODO: Should this stay public rather than private? as cross_covariance()?
@@ -65,14 +64,14 @@ class KOHKernelComputation(AbstractKernelComputation):
         N = x.shape[0]
 
         # PART 1 & 2
-        sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta = self._calc_sub_kernels(
+        sigma_eta, sigma_delta, sigma_epsilon_eta = self._calc_sub_kernels(
             kernel, x, y
         )
 
         # PART 3 - Construct the output array
         return sigma_eta + pad(
             block_diag(
-                sigma_delta + sigma_epsilon, 
+                sigma_delta,
                 sigma_epsilon_eta
             ), 
             (

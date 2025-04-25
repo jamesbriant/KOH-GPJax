@@ -4,14 +4,13 @@ from typing import Callable, Dict
 from flax import nnx
 import gpjax as gpx
 import jax.numpy as jnp
-from jaxtyping import (
-    Float,
-)
+from jaxtyping import Float
 from jax.experimental import checkify
 
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import KOHPosterior, construct_posterior
 from kohgpjax.kernels.kohkernel import KOHKernel
+from kohgpjax.objectives import conjugate_mll
 from kohgpjax.parameters import ModelParameters, SampleDict
 
 class KOHModel(nnx.Module):
@@ -62,10 +61,6 @@ class KOHModel(nnx.Module):
         raise NotImplementedError
     
     @abstractmethod
-    def k_epsilon(self, epsilon_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
-        raise NotImplementedError
-    
-    @abstractmethod
     def k_epsilon_eta(self, epsilon_eta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
     
@@ -78,18 +73,18 @@ class KOHModel(nnx.Module):
             num_sim_obs = self.kohdataset.num_sim_obs,
             k_eta = self.k_eta(GPJAX_params['eta']),
             k_delta = self.k_delta(GPJAX_params['delta']),
-            k_epsilon = self.k_epsilon(GPJAX_params['epsilon']),
             k_epsilon_eta = self.k_epsilon_eta(GPJAX_params['epsilon_eta']),
         )
 
     def likelihood(
         self,
-        num_datapoints, 
-        obs_stddev
+        num_datapoints: int, 
+        GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
+        obs_var = 1/GPJAX_params['epsilon']['variances']['variance']
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
-            obs_stddev=obs_stddev
+            obs_stddev=jnp.sqrt(obs_var),
         )
     
     def GP_posterior(
@@ -109,7 +104,7 @@ class KOHModel(nnx.Module):
         )
         likelihood = self.likelihood(
             num_datapoints=self.kohdataset.num_field_obs + self.kohdataset.num_sim_obs, 
-            obs_stddev=jnp.array(0.0) # This is defined in the kernel as field and sim are different, hence 0 here.
+            GPJAX_params=GPJAX_params
         )
         return construct_posterior(prior, likelihood)
     
@@ -120,7 +115,8 @@ class KOHModel(nnx.Module):
     def get_KOH_neg_log_pos_dens_func(self) -> Callable[..., Float]:
         """Returns a function which calculates the negative log posterior density of the model.
         """
-        log_like_func = gpx.objectives.conjugate_mll
+        # log_like_func = gpx.objectives.conjugate_mll
+        log_like_func = conjugate_mll
         log_prior_func = self.model_parameters.get_log_prior_func()
 
         def neg_log_pos_dens(params_unconstrained_flat) -> Float:
