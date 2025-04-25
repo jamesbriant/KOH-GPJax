@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from gpjax.dataset import Dataset #as GPJaxDataset
+from gpjax.dataset import Dataset
 from gpjax.typing import Array
 import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class
