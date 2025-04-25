@@ -1,11 +1,6 @@
 from gpjax.kernels.base import AbstractKernel
-from gpjax.typing import (
-    Array,
-    # ScalarFloat,
-)
 from gpjax.kernels.computations import AbstractKernelComputation
-# from gpjax.kernels.stationary import RBF
-# from gpjax.parameters import Parameter, Static
+from gpjax.typing import Array
 from jaxtyping import Float
 
 from kohgpjax.kernels.computations.kohcomputation import KOHKernelComputation
@@ -22,14 +17,12 @@ class KOHKernel(AbstractKernel):
         num_sim_obs: int,
         k_eta: AbstractKernel,
         k_delta: AbstractKernel,
-        # k_epsilon: AbstractKernel,
         k_epsilon_eta: AbstractKernel,
     ) -> None:
         self.num_field_obs = num_field_obs
         self.num_sim_obs = num_sim_obs
         self.k_eta = k_eta
         self.k_delta = k_delta
-        # self.k_epsilon = k_epsilon
         self.k_epsilon_eta = k_epsilon_eta
 
         self.compute_engine: AbstractKernelComputation = KOHKernelComputation()

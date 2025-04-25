@@ -4,9 +4,7 @@ from typing import Callable, Dict
 from flax import nnx
 import gpjax as gpx
 import jax.numpy as jnp
-from jaxtyping import (
-    Float,
-)
+from jaxtyping import Float
 from jax.experimental import checkify
 
 from kohgpjax.dataset import KOHDataset
@@ -62,10 +60,6 @@ class KOHModel(nnx.Module):
     def k_delta(self, delta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
-    # @abstractmethod
-    # def k_epsilon(self, epsilon_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
-    #     raise NotImplementedError
-    
     @abstractmethod
     def k_epsilon_eta(self, epsilon_eta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
@@ -79,7 +73,6 @@ class KOHModel(nnx.Module):
             num_sim_obs = self.kohdataset.num_sim_obs,
             k_eta = self.k_eta(GPJAX_params['eta']),
             k_delta = self.k_delta(GPJAX_params['delta']),
-            # k_epsilon = self.k_epsilon(GPJAX_params['epsilon']),
             k_epsilon_eta = self.k_epsilon_eta(GPJAX_params['epsilon_eta']),
         )
 
@@ -88,10 +81,6 @@ class KOHModel(nnx.Module):
         num_datapoints: int, 
         GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
-        # return gpx.likelihoods.Gaussian(
-        #     num_datapoints=num_datapoints,
-        #     obs_stddev=obs_stddev
-        # )
         obs_var = 1/GPJAX_params['epsilon']['variances']['variance']
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,

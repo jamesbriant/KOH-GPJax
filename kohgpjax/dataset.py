@@ -94,14 +94,8 @@ class KOHDataset:
     def n(self) -> int:
         r"""Number of observations."""
         return self.d.shape[0]
-
-    # @property #TODO: Is this required? Remove if not.
-    # def in_dim(self) -> int:
-    #     r"""Dimension of the inputs, $X$."""
-    #     return self.X.shape[1]
     
     def tree_flatten(self):
-        # return (self.X, self.y), None
         return (self.field_dataset, self.sim_dataset), None
     
     @classmethod
