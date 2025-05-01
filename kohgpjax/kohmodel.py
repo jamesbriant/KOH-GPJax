@@ -60,9 +60,10 @@ class KOHModel(nnx.Module):
     def k_delta(self, delta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
-    @abstractmethod
+    # @abstractmethod
     def k_epsilon_eta(self, epsilon_eta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
-        raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
+        # raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
+        return gpx.kernels.White(variance=0.0)
     
     def GP_kernel(
         self,
