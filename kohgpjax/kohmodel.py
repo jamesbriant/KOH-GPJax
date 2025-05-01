@@ -16,7 +16,6 @@ from kohgpjax.gps import (
     construct_posterior,
 )
 from kohgpjax.kernels.kohkernel import KOHKernel
-from kohgpjax.objectives import conjugate_mll
 from kohgpjax.parameters import (
     ModelParameters,
     SampleDict,
@@ -28,7 +27,13 @@ class KOHModel(nnx.Module):
     Class for a KOH model.
     """
 
-    def __init__(self, model_parameters: ModelParameters, kohdataset: KOHDataset):
+    def __init__(
+        self,
+        model_parameters: ModelParameters,
+        kohdataset: KOHDataset,
+        obs_stddev: gpx.parameters.Static = None,
+        jitter: float = 1e-6,
+    ):
         """
         Parameters:
         -----------
@@ -36,9 +41,22 @@ class KOHModel(nnx.Module):
             The model parameters for the KOH model.
         kohdataset: KOHDataset
             The dataset containing the field and simulation observations.
+        obs_stddev: gpx.parameters.Static
+            The standard deviation of the observations. If not None, it will be static and not estimated.
+        jitter: float
+            The jitter to add to the covariance matrix for numerical stability.
         """
+        if obs_stddev is not None:
+            if not isinstance(obs_stddev, gpx.parameters.Static):
+                raise ValueError("obs_stddev must be a gpx.parameters.Static object.")
+            if obs_stddev.shape != (1,):
+                raise ValueError("obs_stddev must have shape (1,).")
+            self.obs_stddev = obs_stddev
+
         self.model_parameters = model_parameters
         self.kohdataset = kohdataset
+        self.obs_stddev = obs_stddev  # TODO: This doesn't do anything yet...
+        self.jitter = jitter  # GPJax default is 1e-6
 
     ############## GPJAX MODEL ##############
     #########################################
@@ -52,22 +70,21 @@ class KOHModel(nnx.Module):
         kernel: gpx.kernels.AbstractKernel,
     ) -> gpx.gps.Prior:
         return gpx.gps.Prior(
-            mean_function=prior_mean_function, kernel=kernel, jitter=0.0
+            mean_function=prior_mean_function,
+            kernel=kernel,
+            jitter=self.jitter,
         )
 
     @abstractmethod
-    def k_eta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
+    def k_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
 
     @abstractmethod
-    def k_delta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
+    def k_delta(self, params_constrained) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
 
-    @abstractmethod
-    def k_epsilon_eta(
-        self, params_constrained: SampleDict
-    ) -> gpx.kernels.AbstractKernel:
-        raise NotImplementedError  # TODO: Should this change to a constant 0 by default? White noise?
+    def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        return gpx.kernels.White(variance=0.0)
 
     def GP_kernel(
         self, GPJAX_params: Dict[str, SampleDict]
@@ -115,8 +132,7 @@ class KOHModel(nnx.Module):
 
     def get_KOH_neg_log_pos_dens_func(self) -> Callable[..., Float]:
         """Returns a function which calculates the negative log posterior density of the model."""
-        # log_like_func = gpx.objectives.conjugate_mll
-        log_like_func = conjugate_mll
+        log_like_func = gpx.objectives.conjugate_mll
         log_prior_func = self.model_parameters.get_log_prior_func()
 
         def neg_log_pos_dens(params_unconstrained_flat) -> Float:
