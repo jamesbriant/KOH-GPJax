@@ -91,6 +91,9 @@ class KOHModel(nnx.Module):
             k_eta = self.k_eta(GPJAX_params),
             k_delta = self.k_delta(GPJAX_params),
             k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
+            k_eta = self.k_eta(GPJAX_params),
+            k_delta = self.k_delta(GPJAX_params),
+            k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
         )
 
     def likelihood(
