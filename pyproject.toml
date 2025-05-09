@@ -13,11 +13,11 @@ authors = [ # List of authors
 dependencies = [ # Package requirements
     "beartype",
     "cola-ml",
-    "distrax",
     "flax",
     "gpjax", 
     "jax<0.6", 
     "jaxtyping", 
+    "numpyro",
 ]
 readme = "README.md"
 requires-python = ">=3.10"
