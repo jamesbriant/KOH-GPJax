@@ -53,15 +53,15 @@ class KOHModel(nnx.Module):
         )
     
     @abstractmethod
-    def k_eta(self, eta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
+    def k_eta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
     @abstractmethod
-    def k_delta(self, delta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
+    def k_delta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
     
     @abstractmethod
-    def k_epsilon_eta(self, epsilon_eta_params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
+    def k_epsilon_eta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
     
     def GP_kernel(
@@ -71,9 +71,9 @@ class KOHModel(nnx.Module):
         return KOHKernel(
             num_field_obs = self.kohdataset.num_field_obs,
             num_sim_obs = self.kohdataset.num_sim_obs,
-            k_eta = self.k_eta(GPJAX_params['eta']),
-            k_delta = self.k_delta(GPJAX_params['delta']),
-            k_epsilon_eta = self.k_epsilon_eta(GPJAX_params['epsilon_eta']),
+            k_eta = self.k_eta(GPJAX_params),
+            k_delta = self.k_delta(GPJAX_params),
+            k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
         )
 
     def likelihood(
@@ -81,7 +81,8 @@ class KOHModel(nnx.Module):
         num_datapoints: int, 
         GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
-        obs_var = 1/GPJAX_params['epsilon']['variances']['variance']
+        #TODO: Find a better way to get the observation variance
+        obs_var = 1/GPJAX_params['epsilon']['variances']['precision']
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
             obs_stddev=jnp.sqrt(obs_var),

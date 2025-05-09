@@ -1,40 +1,41 @@
-import distrax
-from gpjax.kernels import AbstractKernel
 import jax
 import jax.numpy as jnp
 from jaxtyping import Float
+import numpyro.distributions as npd
+import numpyro.distributions.transforms as npt
 from typing import Callable, Dict, List, Union
 
 class ParameterPrior:
     def __init__(
         self,
-        distribution: distrax.Distribution, 
-        bijector: distrax.Bijector,
-        invert_bijector: bool = False,
+        distribution: npd.Distribution,
         name: str = None,
     ):
-        """
+        """Distribution on the constrained parameter.
         Args:
-            distribution: A distrax.Distribution object representing the prior distribution.
-            bijector: A distrax.Bijector object representing the transformation to the unconstrained space.
-            invert_bijector: If True, the bijector is inverted.
+            distribution: A numpyro Distribution object representing the prior distribution.
             name: Optional name for the prior.
         """
-        if not isinstance(distribution, distrax.Distribution):
-            raise ValueError("distribution must be a distrax.Distribution object.")
-        if not isinstance(bijector, distrax.Bijector):
-            raise ValueError("bijector must be a distrax.Bijector object.")
+        if not isinstance(distribution, npd.Distribution):
+            raise ValueError("distribution must be a numpyro Distribution object.")
         
         self.distribution = distribution
-        self.bijector = bijector
-        if invert_bijector:
-            self.bijector = distrax.Inverse(self.bijector)
+        self.bijector = npt.biject_to(self.distribution.support) # This maps Reals to the constrained space
         self.name = name
 
-    def forward(self, x):
-        return self.bijector.forward(x)
+    def forward(self, y):
+        """Transform the input to the constrained space.
+        Args:
+            y: The unconstrained input value.
+        """
+        return self.bijector(y)
+    
     def inverse(self, x):
-        return self.bijector.inverse(x)
+        """Transform the input to the unconstrained space.
+        Args:
+            x: The constrained input value.
+        """
+        return self.bijector._inverse(x)
     
     def prob(self, y):
         """Compute the probability density function (PDF) of the distribution.
@@ -48,7 +49,9 @@ class ParameterPrior:
         Args:
             y: The unconstrained input value.
         """
-        x, logdet = self.bijector.inverse_and_log_det(y)
+        x = self.bijector(y) # map y in Reals onto x in the constrained space
+        logdet = self.bijector.log_abs_det_jacobian(y, x)
+
         return self.distribution.log_prob(x) + logdet
     
     def __repr__(self) -> str:
@@ -56,6 +59,7 @@ class ParameterPrior:
             f"Prior(\n"
             f"  distribution={self.distribution},\n"
             f"  bijector={self.bijector},\n"
+            f"  name={self.name},\n"
             f")"
         )
         return repr
@@ -105,7 +109,7 @@ class ModelParameters:
         Returns:
             A tree of samples in the constrained space.
         """
-        return [prior.inverse(samples_flat[i]) for i, prior in enumerate(self.priors_flat)]
+        return [prior.forward(samples_flat[i]) for i, prior in enumerate(self.priors_flat)]
 
     def unflatten_sample(self, samples_flat) -> SampleDict:
         """
@@ -188,6 +192,6 @@ def _check_prior_dict(prior_dict: PriorDict):
         
 
         #TODO: add checks for parameters depending on the AbstractKernel class.
-        # e.g. if kernel_item['kernel'] is RBF, check that lengthscale is a distrax.Distribution
+        # e.g. if kernel_item['kernel'] is RBF, check that lengthscale is a npd.Distribution
         # How to get the parameters from the kernel class?
         # Is this worth the faff?
