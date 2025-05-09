@@ -98,7 +98,8 @@ class KOHModel(nnx.Module):
         num_datapoints: int, 
         GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
-        obs_var = 1/GPJAX_params['epsilon']['variances']['variance']
+        #TODO: Find a better way to get the observation variance
+        obs_var = 1/GPJAX_params['epsilon']['variances']['precision']
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
             obs_stddev=jnp.sqrt(obs_var),
