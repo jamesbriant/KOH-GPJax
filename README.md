@@ -20,137 +20,22 @@ pip install git+https://github.com/jamesbriant/KOH-GPJax.git
 
 Below is an example of how to use the KOH-GPJax framework to perform Bayesian calibration of a computer model.
 
-### Step 1: Define the Model
-
-The model is defined by inheriting from `KOHModel` and implementing the required kernel methods. For example:
-
-```python
-# filepath: /model.py
-import gpjax as gpx
-import jax.numpy as jnp
-from kohgpjax.kohmodel import KOHModel
-
-class Model(KOHModel):
-    def k_eta(self, eta_params_constrained) -> gpx.kernels.AbstractKernel:
-        return gpx.kernels.ProductKernel(
-            kernels=[
-                gpx.kernels.RBF(
-                    active_dims=[0],
-                    lengthscale=jnp.array(eta_params_constrained['lengthscales']['x_0']),
-                    variance=jnp.array(1 / eta_params_constrained['variances']['variance']),
-                ),
-                gpx.kernels.RBF(
-                    active_dims=[1],
-                    lengthscale=jnp.array(eta_params_constrained['lengthscales']['theta_0']),
-                ),
-            ]
-        )
-
-    def k_delta(self, delta_params_constrained) -> gpx.kernels.AbstractKernel:
-        return gpx.kernels.RBF(
-            active_dims=[0],
-            lengthscale=jnp.array(delta_params_constrained['lengthscales']['x_0']),
-            variance=jnp.array(1 / delta_params_constrained['variances']['variance']),
-        )
-
-    def k_epsilon_eta(self, epsilon_eta_params_constrained) -> gpx.kernels.AbstractKernel:
-        return gpx.kernels.White(
-            active_dims=[0],
-            variance=jnp.array(1 / epsilon_eta_params_constrained['variances']['variance']),
-        )
-```
-
-### Step 2: Define the Priors
-
-Define the prior distributions and bijectors for all model parameters:
-
-```python
-# filepath: /priors.py
-import distrax
-from kohgpjax.parameters import ParameterPrior, PriorDict
-
-prior_dict: PriorDict = {
-    'thetas': {
-        'theta_0': ParameterPrior(
-            distrax.Uniform(low=0.3, high=0.5),
-            distrax.Chain([
-                distrax.Inverse(distrax.Tanh()),
-                distrax.Lambda(lambda x: 2 * (x - 0.3) / (0.5 - 0.3) - 1),
-            ]),
-            name='theta_0',
-        ),
-    },
-    'eta': {
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=1.0),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='eta_variance',
-            ),
-        },
-        'lengthscales': {
-            'x_0': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=1.0),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='eta_lengthscale_x_0',
-            ),
-            'theta_0': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=3.5),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='eta_lengthscale_theta_0',
-            ),
-        },
-    },
-    'delta': {
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=10.0, rate=0.33),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='delta_variance',
-            ),
-        },
-        'lengthscales': {
-            'x_0': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=1.0),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='delta_lengthscale_x_0',
-            ),
-        },
-    },
-    'epsilon': { # This is the observation noise used in the likelihood function assuming Gaussian observations.
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=12.0, rate=0.025),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='epsilon_variance',
-            ),
-        },
-    },
-    'epsilon_eta': {
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=10.0, rate=0.001),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='epsilon_eta_variance',
-            ),
-        },
-    },
-}
-```
-
-### Step 3: Load the Data
+### Step 1: Load the Data
 
 Load the field and simulation data into `KOHDataset`:
 
 ```python
 # filepath: /script.py
+from jax import config
+config.update("jax_enable_x64", True)
+
 import numpy as np
 import jax.numpy as jnp
 import gpjax as gpx
 from kohgpjax.dataset import KOHDataset
 
-DATAFIELD = np.loadtxt('path/to/your/field_data.csv', delimiter=',', dtype=np.float32)
-DATASIM = np.loadtxt('path/to/your/sim_data.csv', delimiter=',', dtype=np.float32)
+DATAFIELD = np.loadtxt('field.csv', delimiter=',', dtype=np.float32)
+DATASIM = np.loadtxt('sim.csv', delimiter=',', dtype=np.float32)
 
 xf = jnp.reshape(DATAFIELD[:, 0], (-1, 1)).astype(jnp.float64)
 xc = jnp.reshape(DATASIM[:, 0], (-1, 1)).astype(jnp.float64)
@@ -165,6 +50,116 @@ kohdataset = KOHDataset(field_dataset, sim_dataset)
 ```
 
 Note: `sim_dataset.X` must have at least one additional column over `field_dataset.X`.
+
+### Step 2: Define the Model
+
+The model is defined by inheriting from `KOHModel` and implementing the required kernel methods. For example:
+
+```python
+# filepath: /model.py
+import gpjax as gpx
+import jax.numpy as jnp
+from kohgpjax.kohmodel import KOHModel
+
+class Model(KOHModel):
+    def k_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        params = params_constrained['eta']
+        return gpx.kernels.ProductKernel(
+            kernels=[
+                gpx.kernels.RBF(
+                    active_dims=[0],
+                    lengthscale=jnp.array(params['lengthscales']['x_0']),
+                    variance=jnp.array(1 / params['variances']['precision']),
+                ),
+                gpx.kernels.RBF(
+                    active_dims=[1],
+                    lengthscale=jnp.array(params['lengthscales']['theta_0']),
+                ),
+            ]
+        )
+
+    def k_delta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        params = params_constrained['delta']
+        return gpx.kernels.RBF(
+            active_dims=[0],
+            lengthscale=jnp.array(params['lengthscales']['x_0']),
+            variance=jnp.array(1 / params['variances']['precision']),
+        )
+
+    def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        params = params_constrained['epsilon_eta']
+        return gpx.kernels.White(
+            active_dims=[0],
+            variance=jnp.array(1 / params['variances']['precision']),
+        )
+```
+
+### Step 3: Define the Priors
+
+Define the prior distributions and bijectors for all model parameters:
+
+```python
+# filepath: /priors.py
+import numpyro.distributions as npd
+from kohgpjax.parameters import ParameterPrior, PriorDict
+
+prior_dict: PriorDict = {
+    'thetas': {
+        'theta_0': ParameterPrior(
+            npd.Uniform(low=0.3, high=0.5),
+            name='theta_0',
+        ),
+    },
+    'eta': {
+        'variances': {
+            'precision': ParameterPrior(
+                npd.Gamma(concentration=2.0, rate=1.0),
+                name='eta_precision',
+            ),
+        },
+        'lengthscales': {
+            'x_0': ParameterPrior(
+                npd.Gamma(concentration=2.0, rate=1.0),
+                name='eta_lengthscale_x_0',
+            ),
+            'theta_0': ParameterPrior(
+                npd.Gamma(concentration=2.0, rate=3.5),
+                name='eta_lengthscale_theta_0',
+            ),
+        },
+    },
+    'delta': {
+        'variances': {
+            'precision': ParameterPrior(
+                npd.Gamma(concentration=10.0, rate=0.33),
+                name='delta_precision',
+            ),
+        },
+        'lengthscales': {
+            'x_0': ParameterPrior(
+                npd.Gamma(concentration=2.0, rate=1.0),
+                name='delta_lengthscale_x_0',
+            ),
+        },
+    },
+    'epsilon': { # This is the observation noise used in the likelihood function assuming Gaussian observations.
+        'variances': {
+            'precision': ParameterPrior(
+                npd.Gamma(concentration=12.0, rate=0.025),
+                name='epsilon_precision',
+            ),
+        },
+    },
+    'epsilon_eta': {
+        'variances': {
+            'precision': ParameterPrior(
+                npd.Gamma(concentration=10.0, rate=0.001),
+                name='epsilon_eta_precision',
+            ),
+        },
+    },
+}
+```
 
 ### Step 4: Initialize the Model and Compute NLPD
 
