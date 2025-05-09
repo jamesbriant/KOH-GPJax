@@ -26,7 +26,7 @@ class ParameterPrior:
     def forward(self, y):
         """Transform the input to the constrained space.
         Args:
-            x: The unconstrained input value.
+            y: The unconstrained input value.
         """
         return self.bijector(y)
     
