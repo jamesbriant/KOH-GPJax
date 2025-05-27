@@ -1,6 +1,0 @@
-Install package as an editable module.
-The config settings option ensures pylance in vscode works as expected.
-
-```bash
-pip install -e . --config-settings editable_mode=strict
-```
