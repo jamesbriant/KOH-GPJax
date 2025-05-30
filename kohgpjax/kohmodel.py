@@ -39,8 +39,8 @@ class KOHModel(nnx.Module):
         if obs_stddev is not None:
             if not isinstance(obs_stddev, gpx.parameters.Static):
                 raise ValueError("obs_stddev must be a gpx.parameters.Static object.")
-            if obs_stddev.shape != (1,):
-                raise ValueError("obs_stddev must have shape (1,).")
+            # if obs_stddev.shape != (1,): #TODO: This should be changed to allow a vector of variances
+            #     raise ValueError("obs_stddev must have shape (1,).")
             self.obs_stddev = obs_stddev
         
         self.model_parameters = model_parameters
@@ -79,7 +79,7 @@ class KOHModel(nnx.Module):
     def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
         # raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
         # return gpx.kernels.White(variance=1e-10)
-        return gpx.kernels.White(variance=0.0) # Relies upon my GPJax fork which allows variance to be 0.0.
+        return gpx.kernels.White(variance=0.0)
     
     def GP_kernel(
         self,
@@ -91,9 +91,6 @@ class KOHModel(nnx.Module):
             k_eta = self.k_eta(GPJAX_params),
             k_delta = self.k_delta(GPJAX_params),
             k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
-            k_eta = self.k_eta(GPJAX_params),
-            k_delta = self.k_delta(GPJAX_params),
-            k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
         )
 
     def likelihood(
@@ -102,10 +99,15 @@ class KOHModel(nnx.Module):
         GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
         #TODO: Find a better way to get the observation variance
-        obs_var = 1/GPJAX_params['epsilon']['variances']['precision']
+        if self.obs_stddev:
+            obs_stddev = self.obs_stddev
+        else:
+            obs_stddev = jnp.sqrt(1/GPJAX_params['epsilon']['variances']['precision'])
+        # obs_var = 1/GPJAX_params['epsilon']['variances']['precision']
+
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
-            obs_stddev=jnp.sqrt(obs_var),
+            obs_stddev=obs_stddev,
         )
     
     def GP_posterior(
