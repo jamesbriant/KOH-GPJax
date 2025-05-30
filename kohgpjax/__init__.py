@@ -17,7 +17,6 @@ __contributors__ = "James Briant - https://james.briant.co.uk"
 __version__ = "0.4.0"
 
 __all__ = [
-    "base",
     "gps",
     "kernels",
 ]

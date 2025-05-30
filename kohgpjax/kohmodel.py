@@ -49,8 +49,8 @@ class KOHModel(nnx.Module):
         if obs_stddev is not None:
             if not isinstance(obs_stddev, gpx.parameters.Static):
                 raise ValueError("obs_stddev must be a gpx.parameters.Static object.")
-            if obs_stddev.shape != (1,):
-                raise ValueError("obs_stddev must have shape (1,).")
+            # if obs_stddev.shape != (1,): #TODO: This should be changed to allow a vector of variances
+            #     raise ValueError("obs_stddev must have shape (1,).")
             self.obs_stddev = obs_stddev
 
         self.model_parameters = model_parameters
@@ -104,7 +104,7 @@ class KOHModel(nnx.Module):
         obs_var = 1 / GPJAX_params["epsilon"]["variances"]["precision"]
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
-            obs_stddev=jnp.sqrt(obs_var),
+            obs_stddev=self.obs_stddev,
         )
 
     def GP_posterior(
