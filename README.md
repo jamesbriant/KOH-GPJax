@@ -196,6 +196,70 @@ print("NLPD Value:", nlpd_value)
 print("NLPD Gradient:", nlpd_gradient)
 ```
 
+## Development Setup with Hatch
+
+This project uses [Hatch](https://hatch.pypa.io/latest/) for dependency management and running development tasks.
+
+1.  **Install Hatch:**
+    If you don't have Hatch installed, you can install it via pip:
+    ```bash
+    pip install hatch
+    ```
+
+2.  **Set up the environment:**
+    Navigate to the project root directory and create the development environment:
+    ```bash
+    hatch env create
+    ```
+    This will install all project dependencies and development tools defined in `pyproject.toml`.
+
+3.  **Activate the environment:**
+    To activate the Hatch-managed environment, run:
+    ```bash
+    hatch shell
+    ```
+    You are now in a shell with all dependencies available.
+
+4.  **Running tasks:**
+    Common development tasks are defined as scripts in `pyproject.toml` and can be run using `hatch run <env>:<script_name>`. For the default development environment (`dev`):
+
+    *   **Run tests:**
+        ```bash
+        hatch run dev:test
+        ```
+    *   **Check linting and formatting (all checks):**
+        ```bash
+        hatch run dev:check
+        ```
+        Or, to run individual checks:
+        ```bash
+        hatch run dev:lint-check
+        hatch run dev:black-check
+        hatch run dev:imports-check
+        ```
+    *   **Apply formatting (all formatters):**
+        ```bash
+        hatch run dev:format
+        ```
+        Or, to run individual formatters:
+        ```bash
+        hatch run dev:lint-format
+        hatch run dev:black-format
+        hatch run dev:imports-format
+        ```
+    *   **Run all checks and tests:**
+        ```bash
+        hatch run dev:all-tests
+        ```
+    *   **View test coverage report:**
+        First, generate the coverage data:
+        ```bash
+        hatch run dev:coverage
+        ```
+        Then, you can open `htmlcov/index.html` in your browser, or view the XML report in `coverage.xml`.
+
+Refer to the `[tool.hatch.envs.dev.scripts]` section in `pyproject.toml` for all available scripts.
+
 ## References
 
 [^1]: Kennedy, M.C. and O'Hagan, A. (2001), Bayesian calibration of computer models. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 63: 425-464. [https://doi.org/10.1111/1467-9868.00294](https://doi.org/10.1111/1467-9868.00294)
