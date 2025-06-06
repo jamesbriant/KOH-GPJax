@@ -1,6 +1,0 @@
-beartype
-cola-ml
-flax
-gpjax
-jax
-jaxtyping

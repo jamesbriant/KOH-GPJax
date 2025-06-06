@@ -1,13 +1,14 @@
 import beartype.typing as tp
 from beartype.typing import Tuple
-from gpjax.kernels.base import AbstractKernel
+from gpjax.kernels.base import AbstractKernel  # noqa: F401
 from gpjax.kernels.computations.base import AbstractKernelComputation
 from gpjax.typing import Array
 from jax.numpy import pad
 from jax.scipy.linalg import block_diag
 from jaxtyping import Float
 
-K = tp.TypeVar("K", bound="AbstractKernel")
+K = tp.TypeVar("K", bound="AbstractKernel")  # noqa: F821
+
 
 class KOHKernelComputation(AbstractKernelComputation):
     r"""Dense kernel computation class. Operations with the kernel assume
@@ -27,8 +28,8 @@ class KOHKernelComputation(AbstractKernelComputation):
         x_field = x[:a, ...]
         y_field = y[:a, ...]
 
-        x_sim = x[a:a+b, ...]
-        y_sim = y[a:a+b, ...]
+        x_sim = x[a : a + b, ...]
+        y_sim = y[a : a + b, ...]
 
         # PART 2 - Construct the cross-covariance sub-matrices
         sigma_eta = kernel.k_eta.cross_covariance(x, y)
@@ -41,10 +42,7 @@ class KOHKernelComputation(AbstractKernelComputation):
 
     # def _cross_covariance( #TODO: Should this stay public rather than private? as cross_covariance()?
     def cross_covariance(
-        self, 
-        kernel: K,
-        x: Float[Array, "N D"], 
-        y: Float[Array, "M D"]
+        self, kernel: K, x: Float[Array, "N D"], y: Float[Array, "M D"]
     ) -> Float[Array, "N M"]:
         r"""Compute the cross-covariance matrix.
 
@@ -71,12 +69,6 @@ class KOHKernelComputation(AbstractKernelComputation):
 
         # PART 3 - Construct the output array
         return sigma_eta + pad(
-            block_diag(
-                sigma_delta + sigma_epsilon,
-                sigma_epsilon_eta
-            ), 
-            (
-                (0, N-a-b), 
-                (0, N-a-b)
-            )
+            block_diag(sigma_delta + sigma_epsilon, sigma_epsilon_eta),
+            ((0, N - a - b), (0, N - a - b)),
         )

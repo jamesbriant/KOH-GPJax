@@ -1,15 +1,13 @@
 import beartype.typing as tp
-
 from cola.annotations import PSD
 from cola.linalg.inverse.inv import solve
 from cola.ops import Dense
 from cola.ops.operators import I_like
-
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
 from gpjax.gps import (
-    AbstractPrior,
     AbstractPosterior,
+    AbstractPrior,
     ConjugatePosterior,
     NonConjugatePosterior,
 )
@@ -21,19 +19,18 @@ from gpjax.likelihoods import (
 )
 from gpjax.mean_functions import AbstractMeanFunction
 from gpjax.typing import Array
-
 import jax.numpy as jnp
 from jaxtyping import Num
 
 from kohgpjax.kernels.kohkernel import KOHKernel
 
-K = tp.TypeVar("K", bound=AbstractKernel)
-M = tp.TypeVar("M", bound=AbstractMeanFunction)
-P = tp.TypeVar("P", bound=AbstractPrior)
+K = tp.TypeVar("K", bound=AbstractKernel)  # noqa: F821
+M = tp.TypeVar("M", bound=AbstractMeanFunction)  # noqa: F821
+P = tp.TypeVar("P", bound=AbstractPrior)  # noqa: F821
 PKOH = tp.TypeVar("PKOH", bound=KOHKernel)
 L = tp.TypeVar("L", bound=AbstractLikelihood)
-NGL = tp.TypeVar("NGL", bound=NonGaussian)
-GL = tp.TypeVar("GL", bound=Gaussian)
+NGL = tp.TypeVar("NGL", bound=NonGaussian)  # noqa: F821
+GL = tp.TypeVar("GL", bound=Gaussian)  # noqa: F821
 
 
 class KOHPosterior(AbstractPosterior[PKOH, GL]):
@@ -83,7 +80,9 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         test_inputs: Num[Array, "N D"],
         train_data: Dataset,
     ) -> GaussianDistribution:
-        raise NotImplementedError("Use predict_eta(), predict_zeta() or predict_obs() methods instead.")
+        raise NotImplementedError(
+            "Use predict_eta(), predict_zeta() or predict_obs() methods instead."
+        )
 
     def predict_eta(
         self,
@@ -156,21 +155,25 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         x_stack = jnp.vstack((x, t))
 
         # compute the cross-covariance matrix
-        K = self.prior.kernel.cross_covariance(x_stack, x_stack) # need array, not the cola linear operator so use cross_covariance() method not gram() method
+        K = self.prior.kernel.cross_covariance(
+            x_stack, x_stack
+        )  # need array, not the cola linear operator so use cross_covariance() method not gram() method
         Kxx = K[:n_train, :n_train]
         Kxt = K[:n_train, n_train:]
         Ktt = PSD(Dense(K[n_train:, n_train:]))
 
-        # Σ = Kxx + Io²        
+        # Σ = Kxx + Io²
         Kxx += jnp.diag(
             jnp.pad(
                 jnp.ones(n_obs) * obs_noise,
-                (0, x.shape[0]-n_obs),
+                (0, x.shape[0] - n_obs),
             )
         )
         Kxx += jnp.identity(Kxx.shape[0]) * self.jitter
         Sigma = PSD(Dense(Kxx))
-        Sigma_inv_Kxt = solve(Sigma, Kxt) # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
+        Sigma_inv_Kxt = solve(
+            Sigma, Kxt
+        )  # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
         mean_t = self.prior.mean_function(t)
@@ -182,7 +185,6 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         covariance = PSD(covariance)
 
         return GaussianDistribution(jnp.atleast_1d(mean.squeeze()), covariance)
-
 
     def predict_obs(
         self,
@@ -243,7 +245,6 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
             train_data=train_data,
             include_observation_noise=True,
         )
-
 
     def predict_zeta(
         self,
@@ -324,9 +325,13 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         K = self.prior.kernel.cross_covariance(x_stack, x_stack)
 
         Kxx = K[:n_train, :n_train]
-        Kxt = K[:n_train, n_train:] + jnp.pad(Kddpred, ((0, x.shape[0]-num_field_obs), (0, 0)))
+        Kxt = K[:n_train, n_train:] + jnp.pad(
+            Kddpred, ((0, x.shape[0] - num_field_obs), (0, 0))
+        )
         Ktt = K[n_train:, n_train:] + Kdpreddpred
-        if include_observation_noise: # This cannot be jitted. #TODO: Find a way to make this jittable.
+        if (
+            include_observation_noise
+        ):  # This cannot be jitted. #TODO: Find a way to make this jittable.
             Ktt += jnp.identity(Ktt.shape[0]) * obs_noise
         Ktt = PSD(Dense(Ktt))
 
@@ -334,12 +339,14 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         Kxx += jnp.diag(
             jnp.pad(
                 jnp.ones(n_obs) * obs_noise,
-                (0, x.shape[0]-n_obs),
+                (0, x.shape[0] - n_obs),
             )
         )
         Kxx += jnp.identity(Kxx.shape[0]) * self.jitter
         Sigma = PSD(Dense(Kxx))
-        Sigma_inv_Kxt = solve(Sigma, Kxt) # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
+        Sigma_inv_Kxt = solve(
+            Sigma, Kxt
+        )  # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
 
         # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
         mean_t = self.prior.mean_function(t)
@@ -353,10 +360,10 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         return GaussianDistribution(jnp.atleast_1d(mean.squeeze()), covariance)
 
 
-
 #######################
 # Utils
 #######################
+
 
 @tp.overload
 def construct_posterior(prior: P, likelihood: GL) -> ConjugatePosterior[P, GL]: ...
@@ -367,13 +374,14 @@ def construct_posterior(  # noqa: F811
     prior: P, likelihood: NGL
 ) -> NonConjugatePosterior[P, NGL]: ...
 
+
 @tp.overload
-def construct_posterior(
+def construct_posterior(  # noqa: F811
     prior: PKOH, likelihood: GL
 ) -> KOHPosterior[PKOH, GL]: ...
 
 
-def construct_posterior(prior, likelihood):
+def construct_posterior(prior, likelihood):  # noqa: F811
     r"""Utility function for constructing a posterior object from a prior and
     likelihood. The function will automatically select the correct posterior
     object based on the likelihood.
@@ -392,14 +400,10 @@ def construct_posterior(prior, likelihood):
     if isinstance(likelihood, Gaussian):
         if isinstance(prior.kernel, KOHKernel):
             return KOHPosterior(prior=prior, likelihood=likelihood)
-        
+
         return ConjugatePosterior(prior=prior, likelihood=likelihood)
 
     return NonConjugatePosterior(prior=prior, likelihood=likelihood)
 
 
-
-__all__ = [
-    "KOHPosterior",
-    "construct_posterior"
-]
+__all__ = ["KOHPosterior", "construct_posterior"]
