@@ -33,41 +33,41 @@ class KOHModel(nnx.Module):
         self.model_parameters = model_parameters
         self.kohdataset = kohdataset
 
-    
+
     ############## GPJAX MODEL ##############
     #########################################
 
     def GP_prior_mean_function(self) -> gpx.mean_functions.AbstractMeanFunction:
         return gpx.mean_functions.Zero()
-    
+
 
     def GP_prior(
-        self, 
+        self,
         prior_mean_function: gpx.mean_functions.AbstractMeanFunction,
         kernel: gpx.kernels.AbstractKernel
     ) -> gpx.gps.Prior:
         return gpx.gps.Prior(
-            mean_function=prior_mean_function, 
+            mean_function=prior_mean_function,
             kernel=kernel,
             jitter=0.
         )
-    
+
     @abstractmethod
     def k_eta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
-    
+
     @abstractmethod
     def k_delta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError
-    
+
     @abstractmethod
     def k_epsilon_eta(self, params_constrained: SampleDict) -> gpx.kernels.AbstractKernel:
         raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
-    
+
     def GP_kernel(
         self,
         GPJAX_params: Dict[str, SampleDict]
-    ) -> gpx.kernels.AbstractKernel:        
+    ) -> gpx.kernels.AbstractKernel:
         return KOHKernel(
             num_field_obs = self.kohdataset.num_field_obs,
             num_sim_obs = self.kohdataset.num_sim_obs,
@@ -78,16 +78,16 @@ class KOHModel(nnx.Module):
 
     def likelihood(
         self,
-        num_datapoints: int, 
+        num_datapoints: int,
         GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
         #TODO: Find a better way to get the observation variance
-        obs_var = 1/GPJAX_params['epsilon']['variances']['precision']
+        obs_var = 1/GPJAX_params["epsilon"]["variances"]["precision"]
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
             obs_stddev=jnp.sqrt(obs_var),
         )
-    
+
     def GP_posterior(
         self,
         GPJAX_params: Dict,
@@ -100,15 +100,15 @@ class KOHModel(nnx.Module):
             A KOHPosterior object.
         """
         prior = self.GP_prior(
-            self.GP_prior_mean_function(), 
+            self.GP_prior_mean_function(),
             self.GP_kernel(GPJAX_params)
         )
         likelihood = self.likelihood(
-            num_datapoints=self.kohdataset.num_field_obs + self.kohdataset.num_sim_obs, 
+            num_datapoints=self.kohdataset.num_field_obs + self.kohdataset.num_sim_obs,
             GPJAX_params=GPJAX_params
         )
         return construct_posterior(prior, likelihood)
-    
+
 
     ############## KOH MODEL ##############
     #######################################
@@ -125,7 +125,7 @@ class KOHModel(nnx.Module):
             params_constrained = self.model_parameters.constrain_and_unflatten_sample(params_unconstrained_flat)
 
             # thetas_list needs to maintain the correct order!
-            thetas_list = [params_constrained['thetas'][f"theta_{i}"] for i in range(self.kohdataset.num_calib_params)]
+            thetas_list = [params_constrained["thetas"][f"theta_{i}"] for i in range(self.kohdataset.num_calib_params)]
             dataset = self.kohdataset.get_dataset(jnp.array(thetas_list).reshape(-1,1))
 
             neg_log_like = -log_like_func(
@@ -139,5 +139,5 @@ class KOHModel(nnx.Module):
         def nlpd_checkified(params_unconstrained_flat) -> Float:
             error, value = checkify.checkify(neg_log_pos_dens)(params_unconstrained_flat)
             return value
-        
+
         return nlpd_checkified

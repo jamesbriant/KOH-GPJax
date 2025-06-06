@@ -28,8 +28,8 @@ class KOHKernel(AbstractKernel):
         self.compute_engine: AbstractKernelComputation = KOHKernelComputation()
 
     def __call__(
-            self, 
-            x: Float[Array, " D"], 
+            self,
+            x: Float[Array, " D"],
             y: Float[Array, " D"]
     ) -> Float[Array, ""]:
         r"""

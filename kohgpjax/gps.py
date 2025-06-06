@@ -161,7 +161,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
         Kxt = K[:n_train, n_train:]
         Ktt = PSD(Dense(K[n_train:, n_train:]))
 
-        # Σ = Kxx + Io²        
+        # Σ = Kxx + Io²
         Kxx += jnp.diag(
             jnp.pad(
                 jnp.ones(n_obs) * obs_noise,
@@ -392,7 +392,7 @@ def construct_posterior(prior, likelihood):
     if isinstance(likelihood, Gaussian):
         if isinstance(prior.kernel, KOHKernel):
             return KOHPosterior(prior=prior, likelihood=likelihood)
-        
+
         return ConjugatePosterior(prior=prior, likelihood=likelihood)
 
     return NonConjugatePosterior(prior=prior, likelihood=likelihood)

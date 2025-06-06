@@ -18,7 +18,7 @@ class ParameterPrior:
         """
         if not isinstance(distribution, npd.Distribution):
             raise ValueError("distribution must be a numpyro Distribution object.")
-        
+
         self.distribution = distribution
         self.bijector = npt.biject_to(self.distribution.support) # This maps Reals to the constrained space
         self.name = name
@@ -29,21 +29,21 @@ class ParameterPrior:
             y: The unconstrained input value.
         """
         return self.bijector(y)
-    
+
     def inverse(self, x):
         """Transform the input to the unconstrained space.
         Args:
             x: The constrained input value.
         """
         return self.bijector._inverse(x)
-    
+
     def prob(self, y):
         """Compute the probability density function (PDF) of the distribution.
         Args:
             y: The unconstrained input value.
         """
         return jnp.exp(self.log_prob(y))
-    
+
     def log_prob(self, y):
         """Compute the log probability density function (PDF) of the distribution.
         Args:
@@ -53,7 +53,7 @@ class ParameterPrior:
         logdet = self.bijector.log_abs_det_jacobian(y, x)
 
         return self.distribution.log_prob(x) + logdet
-    
+
     def __repr__(self) -> str:
         repr = (
             f"Prior(\n"
@@ -84,13 +84,13 @@ class ModelParameters:
         Initialize the calibration model parameters.
         :param kernel_config: A dictionary containing the kernel configuration.
         """
-        # Check if the kernel config is valid 
+        # Check if the kernel config is valid
         _check_prior_dict(prior_dict)
         #TODO: Check kernel_config structure agrees with the KOHDataset. Add this check to KOHPosterior?
         # Things to check:
         # - Dimensions of the kernel match the dimensions of the dataset
         # - There are enough theta priors
-        
+
         self.priors = prior_dict
 
         self.priors_flat, self.priors_tree = jax.tree.flatten(self.priors)
@@ -100,7 +100,7 @@ class ModelParameters:
             lambda dist: jax.jit(dist.log_prob),
             self.priors_flat
         )
-    
+
     def constrain_sample(self, samples_flat):
         """
         Transform samples to the constrained space.
@@ -121,7 +121,7 @@ class ModelParameters:
         """
         # Unflatten the samples to the original tree structure
         return jax.tree.unflatten(self.priors_tree, samples_flat)
-    
+
     def constrain_and_unflatten_sample(self, samples_flat) -> SampleDict:
         """
         Transform samples to the constrained space and unflatten them to the original prior tree structure.
@@ -156,9 +156,9 @@ class ModelParameters:
                 unconstrained_params_flat
             )
             return jnp.sum(jnp.concatenate([jnp.atleast_1d(x) for x in log_probs]))
-        
+
         return log_prior_func
-    
+
 
 def _check_prior_dict(prior_dict: PriorDict):
     """
@@ -166,30 +166,30 @@ def _check_prior_dict(prior_dict: PriorDict):
     """
     # Check if the kernel config has the correct keys
     #TODO: make 'epsilon_eta' optional
-    if not set(['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']).issubset(list(prior_dict.keys())):
+    if not set(["thetas", "eta", "delta", "epsilon", "epsilon_eta"]).issubset(list(prior_dict.keys())):
         raise ValueError("prior_dict keys must contain ['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']")
-    
+
     # Check if each kernel has the required keys
     for key, param_prior_dict in prior_dict.items():
-        if key == 'thetas':
+        if key == "thetas":
             if not isinstance(param_prior_dict, dict):
                 raise ValueError(f"prior_dict['{key}'] must be a dictionary of ParameterPrior instances.")
             for sub_param_name, sub_param_item in param_prior_dict.items():
                 if not isinstance(sub_param_item, ParameterPrior):
                     raise ValueError(f"prior_dict['thetas']['{sub_param_name}'] must be a ParameterPrior instance.")
-                
+
         else:
-            if 'variances' not in param_prior_dict:
+            if "variances" not in param_prior_dict:
                 raise KeyError(f"prior_dict key '{key}' must contain 'variances' key with dictionary of ParameterPrior instances.")
 
             for sub_param_type, sub_param_dict in param_prior_dict.items():
                 if not isinstance(sub_param_dict, dict):
                     raise ValueError(f"prior_dict['{key}']['{sub_param_type}'] must be a dictionary of ParameterPrior instances.")
-                
+
                 for sub_param_type_name, param_prior in sub_param_dict.items():
                     if not isinstance(param_prior, ParameterPrior):
                         raise ValueError(f"prior_dict['{key}']['{sub_param_type}']['{sub_param_type_name}'] must be a ParameterPrior instance.")
-        
+
 
         #TODO: add checks for parameters depending on the AbstractKernel class.
         # e.g. if kernel_item['kernel'] is RBF, check that lengthscale is a npd.Distribution
