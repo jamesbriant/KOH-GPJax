@@ -16,7 +16,10 @@ from kohgpjax.gps import (
     construct_posterior,
 )
 from kohgpjax.kernels.kohkernel import KOHKernel
-from kohgpjax.parameters import ModelParameters, SampleDict
+from kohgpjax.parameters import (
+    ModelParameters,
+    SampleDict,
+)
 
 
 class KOHModel(nnx.Module):
