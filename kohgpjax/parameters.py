@@ -168,9 +168,9 @@ def _check_prior_dict(prior_dict: PriorDict):
     #TODO: Make epsilon optional?
     # if not set(['thetas', 'eta', 'delta', 'epsilon']).issubset(list(prior_dict.keys())):
     #     raise ValueError("prior_dict keys must contain ['thetas', 'eta', 'delta', 'epsilon']")
-    require_keys = ['thetas', 'eta', 'delta']
-    if not set(require_keys).issubset(set(prior_dict.keys())):
-        raise ValueError(f"prior_dict keys must contain {require_keys}")
+    required_keys = ['thetas', 'eta', 'delta'] # 'epsilon' and 'epsilon_eta' are optional
+    if not set(required_keys).issubset(set(prior_dict.keys())):
+        raise ValueError(f"prior_dict keys must contain {required_keys}")
     
     # Check if each kernel has the required keys
     for key, param_prior_dict in prior_dict.items():

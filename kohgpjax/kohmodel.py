@@ -10,7 +10,6 @@ from jax.experimental import checkify
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import KOHPosterior, construct_posterior
 from kohgpjax.kernels.kohkernel import KOHKernel
-from kohgpjax.objectives import conjugate_mll
 from kohgpjax.parameters import ModelParameters, SampleDict
 
 class KOHModel(nnx.Module):
@@ -38,14 +37,14 @@ class KOHModel(nnx.Module):
         """
         if obs_stddev is not None:
             if not isinstance(obs_stddev, gpx.parameters.Static):
-                raise ValueError("obs_stddev must be a gpx.parameters.Static object.")
+                raise ValueError("`obs_stddev` must be a `gpx.parameters.Static` object or `None`.")
             # if obs_stddev.shape != (1,): #TODO: This should be changed to allow a vector of variances
-            #     raise ValueError("obs_stddev must have shape (1,).")
+            #     raise ValueError("`obs_stddev` must have shape `(1,)`. For more complex models, implement your own `k_epsilon()` method.")
             self.obs_stddev = obs_stddev
         
         self.model_parameters = model_parameters
         self.kohdataset = kohdataset
-        self.obs_stddev = obs_stddev #TODO: This doesn't do anything yet...
+        self.obs_var = gpx.parameters.Static(obs_stddev**2) if obs_stddev is not None else None
         self.jitter = jitter # GPJax default is 1e-6
 
     
@@ -69,16 +68,45 @@ class KOHModel(nnx.Module):
     
     @abstractmethod
     def k_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        """
+        Returns the eta kernel, which is used to model the structure of the 
+        field observations and simulation outputs.
+        To be implemented by subclasses.
+        Args:
+            params_constrained: The constrained parameters of the model.
+        Returns:
+            A GPJAX kernel.
+        """
         raise NotImplementedError
     
     @abstractmethod
     def k_delta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        """
+        Returns the delta kernel, which is used to model the structure of the
+        calibration parameters.
+        To be implemented by subclasses.
+        Args:
+            params_constrained: The constrained parameters of the model.
+        Returns:
+            A GPJAX kernel.
+        """
         raise NotImplementedError
     
-    # @abstractmethod
+    def k_epsilon(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        """
+        Returns the epsilon kernel, which defaults to a white noise kernel.
+        This is used to model the observation variance.
+        Args:
+            params_constrained: The constrained parameters of the model.
+        Returns:
+            A GPJAX white noise kernel with the observation variance.
+        """
+        return gpx.kernels.White(
+            active_dims=list(range(self.kohdataset.num_variable_params)),
+            variance=self.obs_var,
+        )
+
     def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
-        # raise NotImplementedError # TODO: Should this change to a constant 0 by default? White noise?
-        # return gpx.kernels.White(variance=1e-10)
         return gpx.kernels.White(variance=0.0)
     
     def GP_kernel(
@@ -90,24 +118,26 @@ class KOHModel(nnx.Module):
             num_sim_obs = self.kohdataset.num_sim_obs,
             k_eta = self.k_eta(GPJAX_params),
             k_delta = self.k_delta(GPJAX_params),
+            k_epsilon = self.k_epsilon(GPJAX_params),
             k_epsilon_eta = self.k_epsilon_eta(GPJAX_params),
         )
 
     def likelihood(
         self,
-        num_datapoints: int, 
+        num_datapoints: int,
         GPJAX_params: Dict[str, SampleDict]
     ) -> gpx.likelihoods.AbstractLikelihood:
-        #TODO: Find a better way to get the observation variance
-        if self.obs_stddev:
-            obs_stddev = self.obs_stddev
-        else:
-            obs_stddev = jnp.sqrt(1/GPJAX_params['epsilon']['variances']['precision'])
-        # obs_var = 1/GPJAX_params['epsilon']['variances']['precision']
-
+        """
+        Constructs the likelihood for the KOH model.
+        Args:
+            num_datapoints: The number of data points in the dataset.
+            GPJAX_params: The GPJAX parameters in the same shape as prior_dict.
+        Returns:
+            A GPJAX likelihood object.
+        """
         return gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
-            obs_stddev=obs_stddev,
+            obs_stddev=0.0, # See self.k_epsilon()
         )
     
     def GP_posterior(
@@ -138,7 +168,7 @@ class KOHModel(nnx.Module):
     def get_KOH_neg_log_pos_dens_func(self) -> Callable[..., Float]:
         """Returns a function which calculates the negative log posterior density of the model.
         """
-        log_like_func = conjugate_mll
+        log_like_func = gpx.objectives.conjugate_mll
         log_prior_func = self.model_parameters.get_log_prior_func()
 
         def neg_log_pos_dens(params_unconstrained_flat) -> Float:
