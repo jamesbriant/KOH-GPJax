@@ -28,9 +28,8 @@ class KOHDataset:
 
         self.num_sim_obs = self.sim_dataset.y.shape[0]
         self.num_field_obs = self.field_dataset.y.shape[0]
-        self.num_calib_params = (
-            self.sim_dataset.X.shape[1] - self.field_dataset.X.shape[1]
-        )
+        self.num_variable_params = self.field_dataset.X.shape[1]
+        self.num_calib_params = self.sim_dataset.X.shape[1] - self.num_variable_params
 
     def __repr__(self) -> str:
         r"""Returns a string representation of the KOHDataset instance."""
@@ -42,7 +41,7 @@ class KOHDataset:
             f"  Attributes:\n"
             f"    No. field observations = {self.num_field_obs},\n"
             f"    No. simulation outputs = {self.num_sim_obs},\n"
-            f"    No. variable params = {self.field_dataset.X.shape[1]},\n"
+            f"    No. variable params = {self.num_variable_params},\n"
             f"    No. calibration params = {self.num_calib_params},\n"
             f")"
         )
