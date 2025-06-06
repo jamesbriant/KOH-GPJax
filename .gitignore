@@ -1,6 +1,7 @@
 __pycache__
 .vscode
 build/
+.pytest_cache/
 
 kohgpjax.egg-info/
 data/
