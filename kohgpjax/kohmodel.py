@@ -114,9 +114,20 @@ class KOHModel(nnx.Module):
         Returns:
             A GPJAX white noise kernel with the observation variance.
         """
+        variance_to_use = self.obs_var
+        if variance_to_use is None:
+            # If obs_var is not static (i.e., learnable), get it from params_constrained
+            # Assuming it's structured like: params_constrained['epsilon']['variances']['obs_noise']
+            # This path needs to be consistent with how ModelParameters structures things.
+            # The fixture `simple_prior_dict` has:
+            # "epsilon": {"variances": {"obs_noise": ParameterPrior(npd.HalfNormal(1.0))}},
+            variance_to_use = params_constrained.get("epsilon", {}).get("variances", {}).get("obs_noise")
+            if variance_to_use is None:
+                raise ValueError("k_epsilon: variance is None from both self.obs_var and params_constrained.")
+
         return gpx.kernels.White(
             active_dims=list(range(self.kohdataset.num_variable_params)),
-            variance=self.obs_var,
+            variance=variance_to_use,
         )
 
     def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:

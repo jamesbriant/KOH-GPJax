@@ -134,5 +134,5 @@ def _check_theta_shape(theta: Array, num_calib_params: int) -> None:
     # TODO: This if statement needs tidying up. It is me being lazy.
     if theta.shape not in ((num_calib_params, 1), (1, num_calib_params)):
         raise ValueError(
-            f"Parameter theta must have shape (Q, 1) OR (1, Q). Got theta.shape={theta.shape}"
+                f"Parameter theta must have shape ({num_calib_params}, 1) OR (1, {num_calib_params}). Got theta.shape={theta.shape}"
         )
