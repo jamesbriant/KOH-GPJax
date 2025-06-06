@@ -108,6 +108,7 @@ class KOHModel(nnx.Module):
 
     def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
         return gpx.kernels.White(variance=0.0)
+
     
     def GP_kernel(
         self,
