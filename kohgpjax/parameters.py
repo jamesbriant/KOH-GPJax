@@ -165,9 +165,12 @@ def _check_prior_dict(prior_dict: PriorDict):
     Check if the kernel config is valid.
     """
     # Check if the kernel config has the correct keys
-    #TODO: make 'epsilon_eta' optional
-    if not set(['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']).issubset(list(prior_dict.keys())):
-        raise ValueError("prior_dict keys must contain ['thetas', 'eta', 'delta', 'epsilon', 'epsilon_eta']")
+    #TODO: Make epsilon optional?
+    # if not set(['thetas', 'eta', 'delta', 'epsilon']).issubset(list(prior_dict.keys())):
+    #     raise ValueError("prior_dict keys must contain ['thetas', 'eta', 'delta', 'epsilon']")
+    required_keys = ['thetas', 'eta', 'delta'] # 'epsilon' and 'epsilon_eta' are optional
+    if not set(required_keys).issubset(set(prior_dict.keys())):
+        raise ValueError(f"prior_dict keys must contain {required_keys}")
     
     # Check if each kernel has the required keys
     for key, param_prior_dict in prior_dict.items():
@@ -190,6 +193,7 @@ def _check_prior_dict(prior_dict: PriorDict):
                     if not isinstance(param_prior, ParameterPrior):
                         raise ValueError(f"prior_dict['{key}']['{sub_param_type}']['{sub_param_type_name}'] must be a ParameterPrior instance.")
         
+        #TODO: Add checks to ensure prior_dict is compatible with the KOHModel() instance.
 
         #TODO: add checks for parameters depending on the AbstractKernel class.
         # e.g. if kernel_item['kernel'] is RBF, check that lengthscale is a npd.Distribution
