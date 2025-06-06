@@ -39,7 +39,6 @@ class KOHKernelComputation(AbstractKernelComputation):
 
         return sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta
 
-
     # def _cross_covariance( #TODO: Should this stay public rather than private? as cross_covariance()?
     def cross_covariance(
         self, kernel: K, x: Float[Array, "N D"], y: Float[Array, "M D"]
@@ -63,8 +62,8 @@ class KOHKernelComputation(AbstractKernelComputation):
         N = x.shape[0]
 
         # PART 1 & 2
-        sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta = self._calc_sub_kernels(
-            kernel, x, y
+        sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta = (
+            self._calc_sub_kernels(kernel, x, y)
         )
 
         # PART 3 - Construct the output array
