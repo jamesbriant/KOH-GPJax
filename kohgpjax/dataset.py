@@ -6,6 +6,7 @@ import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class
 from jaxtyping import Num
 
+
 @dataclass
 @register_pytree_node_class
 class KOHDataset:
@@ -27,7 +28,9 @@ class KOHDataset:
 
         self.num_sim_obs = self.sim_dataset.y.shape[0]
         self.num_field_obs = self.field_dataset.y.shape[0]
-        self.num_calib_params = self.sim_dataset.X.shape[1] - self.field_dataset.X.shape[1]
+        self.num_calib_params = (
+            self.sim_dataset.X.shape[1] - self.field_dataset.X.shape[1]
+        )
 
     def __repr__(self) -> str:
         r"""Returns a string representation of the KOHDataset instance."""
@@ -103,10 +106,7 @@ class KOHDataset:
         return cls(*children)
 
 
-def _check_shapes(
-    sim_dataset: Dataset,
-    field_dataset: Dataset
-) -> None:
+def _check_shapes(sim_dataset: Dataset, field_dataset: Dataset) -> None:
     r"""Check that the shapes of the simulation and observation datasets are compatible."""
     if sim_dataset.X.shape[1] <= field_dataset.X.shape[1]:
         raise ValueError(
@@ -132,7 +132,8 @@ def _check_theta_shape(theta: Array, num_calib_params: int) -> None:
             f"Parameter theta must be a 2D array. Got theta.ndim={theta.ndim}"
         )
 
-    if theta.shape != (num_calib_params, 1) and theta.shape != (1, num_calib_params):
+    # TODO: This if statement needs tidying up. It is me being lazy.
+    if theta.shape not in ((num_calib_params, 1), (1, num_calib_params)):
         raise ValueError(
             f"Parameter theta must have shape (Q, 1) OR (1, Q). Got theta.shape={theta.shape}"
         )

@@ -1,11 +1,10 @@
 from cola.annotations import PSD
 from cola.ops import Dense
 from cola.ops.operators import I_like
-import jax.numpy as jnp
-
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
 from gpjax.typing import ScalarFloat
+import jax.numpy as jnp
 
 from kohgpjax.gps import KOHPosterior
 
@@ -78,11 +77,13 @@ def conjugate_mll(posterior: KOHPosterior, data: Dataset) -> ScalarFloat:
     ###### NEW METHOD ######
     # compute the cross-covariance matrix
     # Σ = (Kxx + Io²) = LLᵀ
-    Kxx = posterior.prior.kernel.cross_covariance(x, x) # need array, not the cola linear operator so use cross_covariance() method not gram() method
+    Kxx = posterior.prior.kernel.cross_covariance(
+        x, x
+    )  # need array, not the cola linear operator so use cross_covariance() method not gram() method
     Kxx += jnp.diag(
         jnp.pad(
             jnp.ones(n_obs) * obs_noise,
-            (0, x.shape[0]-n_obs),
+            (0, x.shape[0] - n_obs),
         )
     )
     Kxx = Dense(Kxx)
