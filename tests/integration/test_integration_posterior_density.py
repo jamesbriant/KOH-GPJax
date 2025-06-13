@@ -1,14 +1,13 @@
-from jax import config # Re-adding config for early x64 enabling
-config.update("jax_enable_x64", True) # Needs to be before JAX ops at global scope
+from jax import config  # Re-adding config for early x64 enabling
+
+config.update("jax_enable_x64", True)  # Needs to be before JAX ops at global scope
 
 import gpjax as gpx
 from jax import (
     jit,
     numpy as jnp,
 )
-# import numpy as np # No longer needed for np.loadtxt
 import numpyro.distributions as npd
-# import jax.tree_util as jtu # No longer needed after removing __main__ block
 
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.kohmodel import KOHModel
@@ -18,28 +17,21 @@ from kohgpjax.parameters import (
     PriorDict,
 )
 
-# Original DATAFIELD = np.loadtxt("/Users/jamesbriant/Documents/Projects/BayesianCalibrationExamples/presentable/data/toy/field.csv", delimiter=",", dtype=np.float32)
-# Original DATACOMP = np.loadtxt("/Users/jamesbriant/Documents/Projects/BayesianCalibrationExamples/presentable/data/toy/sim.csv", delimiter=",", dtype=np.float32)
-
 # Using minimal inline data instead of external CSV files
 # Field data: xf (1 var_param), yf
-DATAFIELD_MOCK = jnp.array([
-    [1.0, 10.0],
-    [2.0, 12.0]
-], dtype=jnp.float32)
+DATAFIELD_MOCK = jnp.array([[1.0, 10.0], [2.0, 12.0]], dtype=jnp.float32)
 
 # Simulation data: xc (1 var_param), tc (1 design_param/calib_param for KOHDataset), yc
-DATACOMP_MOCK = jnp.array([
-    [1.1, 0.5, 11.0],
-    [2.1, 0.6, 23.0]
-], dtype=jnp.float32)
+DATACOMP_MOCK = jnp.array([[1.1, 0.5, 11.0], [2.1, 0.6, 23.0]], dtype=jnp.float32)
 
 
 xf = jnp.reshape(DATAFIELD_MOCK[:, 0], (-1, 1)).astype(jnp.float64)
 yf = jnp.reshape(DATAFIELD_MOCK[:, 1], (-1, 1)).astype(jnp.float64)
 
 xc = jnp.reshape(DATACOMP_MOCK[:, 0], (-1, 1)).astype(jnp.float64)
-tc = jnp.reshape(DATACOMP_MOCK[:, 1], (-1, 1)).astype(jnp.float64) # This corresponds to the calibration parameter input in the simulation design
+tc = jnp.reshape(DATACOMP_MOCK[:, 1], (-1, 1)).astype(
+    jnp.float64
+)  # This corresponds to the calibration parameter input in the simulation design
 yc = jnp.reshape(DATACOMP_MOCK[:, 2], (-1, 1)).astype(jnp.float64)
 
 
@@ -55,7 +47,7 @@ comp_dataset = gpx.Dataset(jnp.hstack((xc, tc)), yc)
 kohdataset = KOHDataset(field_dataset, comp_dataset)
 
 prior_dict: PriorDict = {
-    "thetas": { # Corresponds to num_calib_params = 1
+    "thetas": {  # Corresponds to num_calib_params = 1
         "theta_0": ParameterPrior(npd.Normal(loc=0.0, scale=1.0)),
     },
     "eta": {
@@ -84,40 +76,47 @@ class MyModel(KOHModel):
     # Workaround to provide kohdataset to k_delta for active_dims
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._kohdataset_cached_for_test = kwargs.get('kohdataset')
+        self._kohdataset_cached_for_test = kwargs.get("kohdataset")
 
     def k_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
         eta_params = GPJAX_params.get("eta", {})
         len_x0 = eta_params.get("lengthscales", {}).get("x_0", 1.0)
         len_theta0 = eta_params.get("lengthscales", {}).get("theta_0", 1.0)
-        var_eta = eta_params.get("variances", {}).get("var", 1.0) # Adjusted path
+        var_eta = eta_params.get("variances", {}).get("var", 1.0)  # Adjusted path
 
         return gpx.kernels.ProductKernel(
             kernels=[
                 gpx.kernels.RBF(active_dims=[0], lengthscale=len_x0),
                 gpx.kernels.RBF(active_dims=[1], lengthscale=len_theta0),
             ]
-        ) * gpx.kernels.Constant(constant=var_eta) # Multiply by overall variance
+        ) * gpx.kernels.Constant(constant=var_eta)  # Multiply by overall variance
 
     def k_delta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
         delta_params = GPJAX_params.get("delta", {})
         len_x0 = delta_params.get("lengthscales", {}).get("x_0", 1.0)
-        var_delta = delta_params.get("variances", {}).get("var", 1.0) # Adjusted path
+        var_delta = delta_params.get("variances", {}).get("var", 1.0)  # Adjusted path
 
         return gpx.kernels.RBF(
-            active_dims=list(range(self._kohdataset_cached_for_test.num_variable_params)),
+            active_dims=list(
+                range(self._kohdataset_cached_for_test.num_variable_params)
+            ),
             lengthscale=len_x0,
             variance=var_delta,
         )
 
     def k_epsilon_eta(self, GPJAX_params) -> gpx.kernels.AbstractKernel:
         epsilon_eta_params = GPJAX_params.get("epsilon_eta", {})
-        var_eps_eta = epsilon_eta_params.get("variances", {}).get("var", 0.01) # Adjusted path
+        var_eps_eta = epsilon_eta_params.get("variances", {}).get(
+            "var", 0.01
+        )  # Adjusted path
 
         return gpx.kernels.White(
-            active_dims=list(range(self._kohdataset_cached_for_test.num_variable_params)),
-            variance=var_eps_eta
+            active_dims=list(
+                range(self._kohdataset_cached_for_test.num_variable_params)
+            ),
+            variance=var_eps_eta,
         )
+
 
 # The following global instantiations are part of the original test structure.
 # They will be executed when pytest collects the test file.
@@ -125,7 +124,7 @@ class MyModel(KOHModel):
 model_params = ModelParameters(prior_dict)
 model = MyModel(
     model_parameters=model_params,
-    kohdataset=kohdataset
+    kohdataset=kohdataset,
     # obs_stddev=None, so k_epsilon will use params from 'epsilon.variances.obs_noise'
     # This is handled by KOHModel.k_epsilon's logic to get from params_constrained.
 )
@@ -162,25 +161,27 @@ def test_neg_log_posterior_density_runs():
     # thetas (theta_0)
     # Example values, actual values don't matter as much as the correct length and type
     mcmc_params = [
-        0.1, # delta.lengthscales.x_0
-        0.2, # delta.variances.var
-        0.3, # epsilon.variances.obs_noise
-        0.4, # epsilon_eta.variances.var
-        0.5, # eta.lengthscales.theta_0
-        0.6, # eta.lengthscales.x_0
-        0.7, # eta.variances.var
-        0.8, # thetas.theta_0
+        0.1,  # delta.lengthscales.x_0
+        0.2,  # delta.variances.var
+        0.3,  # epsilon.variances.obs_noise
+        0.4,  # epsilon_eta.variances.var
+        0.5,  # eta.lengthscales.theta_0
+        0.6,  # eta.lengthscales.x_0
+        0.7,  # eta.variances.var
+        0.8,  # thetas.theta_0
     ]
-    assert len(mcmc_params) == model_params.n_params, \
+    assert len(mcmc_params) == model_params.n_params, (
         f"mcmc_params length {len(mcmc_params)} != n_params {model_params.n_params}"
+    )
 
-    result = f(jnp.array(mcmc_params, dtype=jnp.float64)) # Ensure it's a JAX array
+    result = f(jnp.array(mcmc_params, dtype=jnp.float64))  # Ensure it's a JAX array
     print(f"Computed -log posterior density: {result}")
     # Original value was 707.3885600290141 with different data and potentially different prior structure.
     # With new data and structure, the value will differ.
     # The key is that it runs and returns a scalar float without NaN.
     assert isinstance(result, jnp.ndarray)
-    assert result.shape == () # Scalar
+    assert result.shape == ()  # Scalar
     assert not jnp.isnan(result)
+
 
 # End of test_integration_posterior_density.py

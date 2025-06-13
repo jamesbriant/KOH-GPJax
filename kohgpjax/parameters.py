@@ -5,6 +5,7 @@ from typing import (
     Union,
 )
 
+import beartype.typing as tp
 import jax
 import jax.numpy as jnp
 from jaxtyping import Float
@@ -88,9 +89,23 @@ SampleDict = Dict[
     str, Float
 ]  # TODO: Is this correct? It should be a tree of samples, not just a dict of floats.
 
+KPD = tp.TypeVar(
+    "KPD",
+    bound=KernelParamsDict,
+)  # Type variable for KernelParamsDict, used in type hints
+# Type variable for PriorDict, used in type hints
+PD = tp.TypeVar(
+    "PD",
+    bound=PriorDict,
+)  # Type variable for PriorDict, used in type hints
+SD = tp.TypeVar(
+    "SD",
+    bound=SampleDict,
+)  # Type variable for SampleDict, used in type hints
+
 
 class ModelParameters:
-    def __init__(self, prior_dict: PriorDict):
+    def __init__(self, prior_dict: PD):
         """
         Initialize the calibration model parameters.
         :param kernel_config: A dictionary containing the kernel configuration.

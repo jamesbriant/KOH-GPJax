@@ -26,10 +26,12 @@ class KOHDataset:
         r"""Checks that the shapes of $z$, $y$, $X_f$ and $X_s$ are compatible"""
         _check_shapes(self.sim_dataset, self.field_dataset)
 
-        self.num_sim_obs = self.sim_dataset.y.shape[0]
-        self.num_field_obs = self.field_dataset.y.shape[0]
-        self.num_variable_params = self.field_dataset.X.shape[1]
-        self.num_calib_params = self.sim_dataset.X.shape[1] - self.num_variable_params
+        self.num_sim_obs: Num[Array, "n"] = self.sim_dataset.y.shape[0]
+        self.num_field_obs: Num[Array, "N"] = self.field_dataset.y.shape[0]
+        self.num_variable_params: Num[Array, "P"] = self.field_dataset.X.shape[1]
+        self.num_calib_params: Num[Array, "Q"] = (
+            self.sim_dataset.X.shape[1] - self.num_variable_params
+        )
 
     def __repr__(self) -> str:
         r"""Returns a string representation of the KOHDataset instance."""
@@ -134,5 +136,5 @@ def _check_theta_shape(theta: Array, num_calib_params: int) -> None:
     # TODO: This if statement needs tidying up. It is me being lazy.
     if theta.shape not in ((num_calib_params, 1), (1, num_calib_params)):
         raise ValueError(
-                f"Parameter theta must have shape ({num_calib_params}, 1) OR (1, {num_calib_params}). Got theta.shape={theta.shape}"
+            f"Parameter theta must have shape ({num_calib_params}, 1) OR (1, {num_calib_params}). Got theta.shape={theta.shape}"
         )
