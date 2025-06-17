@@ -1,9 +1,6 @@
 from gpjax.kernels.base import AbstractKernel
 from gpjax.kernels.computations import AbstractKernelComputation
-from gpjax.typing import (
-    Array,
-    ScalarFloat,
-)
+from gpjax.typing import Array
 from jaxtyping import Float
 
 from kohgpjax.kernels.computations.kohcomputation import KOHKernelComputation
@@ -33,10 +30,8 @@ class KOHKernel(AbstractKernel):
         self.compute_engine: AbstractKernelComputation = KOHKernelComputation()
 
     def __call__(
-        self,
-        x: Float[Array, " D"],
-        y: Float[Array, " D"],
-    ) -> ScalarFloat:
+        self, x: Float[Array, " D"], y: Float[Array, " D"]
+    ) -> Float[Array, ""]:
         r"""
         Args:
             x (Float[Array, " D"]): The left hand argument of the kernel function's call.
@@ -46,5 +41,5 @@ class KOHKernel(AbstractKernel):
             Float: The value of $`k(x, y)`$.
         """
         raise NotImplementedError(
-            "It is not obvious how to compute the kernel value for this kernel. Instead calculate the desired value by calling one of the components (or subkernels) of this class."
+            "It is no obvious how to compute the kernel value for this kernel. Instead calculate the desired value by calling one of the components (or subkernels) of this class."
         )

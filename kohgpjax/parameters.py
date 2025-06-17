@@ -5,10 +5,10 @@ from typing import (
     Union,
 )
 
-import beartype.typing as tp
 import jax
 import jax.numpy as jnp
-from jaxtyping import Float
+import jaxtyping # Changed from 'from jaxtyping import Float'
+from gpjax.typing import Array # Added for jaxtyping.Float[Array, "..."]
 import numpyro.distributions as npd
 import numpyro.distributions.transforms as npt
 
@@ -86,26 +86,12 @@ KernelParamsDict = Dict[
 PriorDict = Dict[str, KernelParamsDict]
 
 SampleDict = Dict[
-    str, Float
+    str, jaxtyping.Float[Array, "..."]
 ]  # TODO: Is this correct? It should be a tree of samples, not just a dict of floats.
-
-KPD = tp.TypeVar(
-    "KPD",
-    bound=KernelParamsDict,
-)  # Type variable for KernelParamsDict, used in type hints
-# Type variable for PriorDict, used in type hints
-PD = tp.TypeVar(
-    "PD",
-    bound=PriorDict,
-)  # Type variable for PriorDict, used in type hints
-SD = tp.TypeVar(
-    "SD",
-    bound=SampleDict,
-)  # Type variable for SampleDict, used in type hints
 
 
 class ModelParameters:
-    def __init__(self, prior_dict: PD):
+    def __init__(self, prior_dict: PriorDict):
         """
         Initialize the calibration model parameters.
         :param kernel_config: A dictionary containing the kernel configuration.
@@ -122,7 +108,7 @@ class ModelParameters:
         self.priors_flat, self.priors_tree = jax.tree.flatten(self.priors)
         self.n_params = len(self.priors_flat)
 
-        self.prior_log_prob_funcs: List[Callable[[Float], Float]] = jax.tree.map(
+        self.prior_log_prob_funcs: List[Callable[[jaxtyping.Float[Array, "..."]], jaxtyping.Float[Array, ""]]] = jax.tree.map(
             lambda dist: jax.jit(dist.log_prob), self.priors_flat
         )
 
@@ -161,7 +147,7 @@ class ModelParameters:
         constrained_samples = self.constrain_sample(samples_flat)
         return self.unflatten_sample(constrained_samples)
 
-    def get_log_prior_func(self) -> Callable[[List], Float]:
+    def get_log_prior_func(self) -> Callable[[List[jaxtyping.Float[Array, "..."]]], jaxtyping.Float[Array, ""]]:
         """Compute the joint log prior probability.
 
         Returns:
@@ -169,7 +155,7 @@ class ModelParameters:
         """
 
         @jax.jit
-        def log_prior_func(unconstrained_params_flat: List) -> Float:
+        def log_prior_func(unconstrained_params_flat: List[jaxtyping.Float[Array, "..."]]) -> jaxtyping.Float[Array, ""]:
             """
             Compute the joint log prior probability.
             Args:
