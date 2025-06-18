@@ -18,8 +18,8 @@ class KOHKernelComputation(AbstractKernelComputation):
     def _calc_sub_kernels(
         self,
         kernel: K,
-        x: Float[Array, "N D"],
-        y: Float[Array, "M D"],
+        x,  #: Float[Array, "N D"],
+        y,  #: Float[Array, "M D"],
     ) -> Tuple[Array, ...]:
         # PART 1 - Extract the field observations and simulation outputs
         a = kernel.num_field_obs
@@ -41,8 +41,11 @@ class KOHKernelComputation(AbstractKernelComputation):
 
     # def _cross_covariance( #TODO: Should this stay public rather than private? as cross_covariance()?
     def cross_covariance(
-        self, kernel: K, x: Float[Array, "N D"], y: Float[Array, "M D"]
-    ) -> Float[Array, "N M"]:
+        self,
+        kernel: K,
+        x,  #: Float[Array, "N D"],
+        y,  #: Float[Array, "M D"]
+    ):  # -> Float[Array, "N M"]:
         r"""Compute the cross-covariance matrix.
 
         For a given kernel, compute the NxM covariance matrix on a pair of input

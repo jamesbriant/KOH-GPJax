@@ -30,8 +30,10 @@ class KOHKernel(AbstractKernel):
         self.compute_engine: AbstractKernelComputation = KOHKernelComputation()
 
     def __call__(
-        self, x: Float[Array, " D"], y: Float[Array, " D"]
-    ) -> Float[Array, ""]:
+        self,
+        x,  #: Float[Array, " D"],
+        y,  #: Float[Array, " D"]
+    ):  # -> Float[Array, ""]:
         r"""
         Args:
             x (Float[Array, " D"]): The left hand argument of the kernel function's call.

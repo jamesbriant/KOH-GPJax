@@ -4,12 +4,13 @@ from typing import (
     Dict,
 )
 
+import beartype.typing as tp
 from flax import nnx
 import gpjax as gpx
-from gpjax.typing import Array # Added
+from gpjax.typing import Array  # Added
 from jax.experimental import checkify
 import jax.numpy as jnp
-import jaxtyping # Changed from 'from jaxtyping import Float'
+import jaxtyping  # Changed from 'from jaxtyping import Float'
 
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import (
@@ -18,9 +19,11 @@ from kohgpjax.gps import (
 )
 from kohgpjax.kernels.kohkernel import KOHKernel
 from kohgpjax.parameters import (
+    ModelParameterDict,
     ModelParameters,
-    SampleDict,
 )
+
+MP = tp.TypeVar("MP", bound="ModelParameters")
 
 
 class KOHModel(nnx.Module):
@@ -30,7 +33,7 @@ class KOHModel(nnx.Module):
 
     def __init__(
         self,
-        model_parameters: ModelParameters,
+        model_parameters: MP,
         kohdataset: KOHDataset,
         obs_stddev: gpx.parameters.Static = None,
         jitter: float = 1e-6,
@@ -38,7 +41,7 @@ class KOHModel(nnx.Module):
         """
         Parameters:
         -----------
-        model_parameters: CalibrationModelParameters
+        model_parameters: ModelParameters
             The model parameters for the KOH model.
         kohdataset: KOHDataset
             The dataset containing the field and simulation observations.
@@ -122,9 +125,15 @@ class KOHModel(nnx.Module):
             # This path needs to be consistent with how ModelParameters structures things.
             # The fixture `simple_prior_dict` has:
             # "epsilon": {"variances": {"obs_noise": ParameterPrior(npd.HalfNormal(1.0))}},
-            variance_to_use = params_constrained.get("epsilon", {}).get("variances", {}).get("obs_noise")
+            variance_to_use = (
+                params_constrained.get("epsilon", {})
+                .get("variances", {})
+                .get("obs_noise")
+            )
             if variance_to_use is None:
-                raise ValueError("k_epsilon: variance is None from both self.obs_var and params_constrained.")
+                raise ValueError(
+                    "k_epsilon: variance is None from both self.obs_var and params_constrained."
+                )
 
         return gpx.kernels.White(
             active_dims=list(range(self.kohdataset.num_variable_params)),
@@ -134,9 +143,7 @@ class KOHModel(nnx.Module):
     def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
         return gpx.kernels.White(variance=0.0)
 
-    def GP_kernel(
-        self, GPJAX_params: Dict[str, SampleDict]
-    ) -> gpx.kernels.AbstractKernel:
+    def GP_kernel(self, GPJAX_params: ModelParameterDict) -> gpx.kernels.AbstractKernel:
         return KOHKernel(
             num_field_obs=self.kohdataset.num_field_obs,
             num_sim_obs=self.kohdataset.num_sim_obs,
@@ -147,7 +154,7 @@ class KOHModel(nnx.Module):
         )
 
     def likelihood(
-        self, num_datapoints: int, GPJAX_params: Dict[str, SampleDict]
+        self, num_datapoints: int, GPJAX_params: ModelParameterDict
     ) -> gpx.likelihoods.AbstractLikelihood:
         """
         Constructs the likelihood for the KOH model.
@@ -164,7 +171,7 @@ class KOHModel(nnx.Module):
 
     def GP_posterior(
         self,
-        GPJAX_params: Dict,
+        GPJAX_params: ModelParameterDict,
     ) -> KOHPosterior:
         """
         Constructs the GP posterior using the GPJAX parameters.
@@ -185,13 +192,17 @@ class KOHModel(nnx.Module):
     ############## KOH MODEL ##############
     #######################################
 
-    def get_KOH_neg_log_pos_dens_func(self) -> Callable[..., jaxtyping.Float[Array, ""]]:
+    def get_KOH_neg_log_pos_dens_func(
+        self,
+    ) -> Callable[..., jaxtyping.Float[Array, ""]]:
         """Returns a function which calculates the negative log posterior density of the model."""
         log_like_func = gpx.objectives.conjugate_mll
         # Type of log_prior_func: Callable[[List[jaxtyping.Float[Array, "..."]]], jaxtyping.Float[Array, ""]]
         log_prior_func = self.model_parameters.get_log_prior_func()
 
-        def neg_log_pos_dens(params_unconstrained_flat: jaxtyping.Float[Array, "Nparams"]) -> jaxtyping.Float[Array, ""]: # Assuming flat array input
+        def neg_log_pos_dens(
+            params_unconstrained_flat: jaxtyping.Float[Array, "Nparams"],
+        ) -> jaxtyping.Float[Array, ""]:  # Assuming flat array input
             # log_prior_func expects a List of arrays/scalars.
             # If params_unconstrained_flat is a single flat array, it needs to be converted to List[Scalar JAX array]
             # This was handled in ModelParameters by tree_map. Here, let's assume params_unconstrained_flat is already a list
@@ -199,10 +210,12 @@ class KOHModel(nnx.Module):
             # Based on ModelParameters.get_log_prior_func, its argument is List[jaxtyping.Float[Array, "..."]]
             # So, params_unconstrained_flat_list should be this type.
             # The input to neg_log_pos_dens is often a flat JAX array from optimizers/samplers.
-            params_unconstrained_flat_list = [x for x in params_unconstrained_flat] # This makes it a list of scalar arrays if input is 1D array
+            params_unconstrained_flat_list = [
+                x for x in params_unconstrained_flat
+            ]  # This makes it a list of scalar arrays if input is 1D array
 
             params_constrained = self.model_parameters.constrain_and_unflatten_sample(
-                params_unconstrained_flat # ModelParameters methods take flat JAX array or list
+                params_unconstrained_flat  # ModelParameters methods take flat JAX array or list
             )
 
             # thetas_list needs to maintain the correct order!
@@ -219,7 +232,9 @@ class KOHModel(nnx.Module):
 
             return neg_log_like - log_prior
 
-        def nlpd_checkified(params_unconstrained_flat: jaxtyping.Float[Array, "Nparams"]) -> jaxtyping.Float[Array, ""]:
+        def nlpd_checkified(
+            params_unconstrained_flat: jaxtyping.Float[Array, "Nparams"],
+        ) -> jaxtyping.Float[Array, ""]:
             error, value = checkify.checkify(neg_log_pos_dens)(
                 params_unconstrained_flat
             )

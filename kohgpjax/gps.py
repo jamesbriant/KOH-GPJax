@@ -77,7 +77,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
 
     def predict(
         self,
-        test_inputs: Num[Array, "N D"],
+        test_inputs,  #: Num[Array, "N D"],
         train_data: Dataset,
     ) -> GaussianDistribution:
         raise NotImplementedError(
@@ -86,7 +86,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
 
     def predict_eta(
         self,
-        test_inputs: Num[Array, "N D"],
+        test_inputs,  #: Num[Array, "N D"],
         train_data: Dataset,
     ) -> GaussianDistribution:
         r"""Query the predictive posterior distribution.
@@ -188,7 +188,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
 
     def predict_obs(
         self,
-        test_inputs: Num[Array, "N D"],
+        test_inputs,  #: Num[Array, "N D"],
         train_data: Dataset,
     ) -> GaussianDistribution:
         r"""Query the predictive posterior distribution.
@@ -248,7 +248,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
 
     def predict_zeta(
         self,
-        test_inputs: Num[Array, "N D"],
+        test_inputs,  #: Num[Array, "N D"],
         train_data: Dataset,
         include_observation_noise: bool = False,
     ) -> GaussianDistribution:
@@ -329,9 +329,7 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
             Kddpred, ((0, x.shape[0] - num_field_obs), (0, 0))
         )
         Ktt = K[n_train:, n_train:] + Kdpreddpred
-        if (
-            include_observation_noise
-        ):  # This cannot be jitted. #TODO: Find a way to make this jittable.
+        if include_observation_noise:
             Ktt += jnp.identity(Ktt.shape[0]) * obs_noise
         Ktt = PSD(Dense(Ktt))
 
