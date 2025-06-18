@@ -6,6 +6,9 @@ build/
 kohgpjax.egg-info/
 data/
 
+.coverage
+coverage.xml
+
 environment.yml
 *.npz
 *.npy

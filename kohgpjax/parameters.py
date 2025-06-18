@@ -1,22 +1,33 @@
-from typing import (
+from beartype.typing import (
     Callable,
     Dict,
     List,
+    Optional,
     Union,
 )
-
+from gpjax.typing import (
+    Array,
+    ScalarFloat,
+)
 import jax
 import jax.numpy as jnp
-from jaxtyping import Float
+from jaxtyping import Float  # Changed from 'from jaxtyping import Float'
 import numpyro.distributions as npd
 import numpyro.distributions.transforms as npt
+
+# from typing import (
+#     Callable,
+#     Dict,
+#     List,
+#     Union,
+# )
 
 
 class ParameterPrior:
     def __init__(
         self,
         distribution: npd.Distribution,
-        name: str = None,
+        name: Optional[str] = None,
     ):
         """Distribution on the constrained parameter.
         Args:
@@ -74,23 +85,41 @@ class ParameterPrior:
         return repr
 
 
-KernelParamsDict = Dict[
-    str,
-    Union[
-        ParameterPrior,
-        Dict[str, ParameterPrior],
-    ],
-]
+# KernelParamsPriorDict = Dict[
+#     str,
+#     Union[
+#         ParameterPrior,
+#         Dict[str, ParameterPrior],
+#     ],
+# ]
 
-PriorDict = Dict[str, KernelParamsDict]
+# PriorDict = Dict[str, KernelParamsPriorDict]
 
-SampleDict = Dict[
-    str, Float
-]  # TODO: Is this correct? It should be a tree of samples, not just a dict of floats.
+# SampleDict = Dict[
+#     str, jaxtyping.Float[Array, "..."]
+# ]  # TODO: Is this correct? It should be a tree of samples, not just a dict of floats.
+# SampleDict = Dict[
+#     str,
+#     Union[
+#         jaxtyping.Float[Array, "..."],
+#         Dict[str, jaxtyping.Float[Array, "..."]],
+#     ],
+# ]
+
+ParameterPriorDict = Dict[str, ParameterPrior]
+GroupParameterPriorDict = Dict[str, ParameterPriorDict]
+ModelParameterPriorDict = Dict[str, Union[ParameterPriorDict, GroupParameterPriorDict]]
+
+ParameterValue = ScalarFloat  # A single parameter value
+ParameterArray = Float[Array, "Nparams"]
+ParameterValueList = List[ParameterValue]  # A list of parameter values
+ParameterDict = Dict[str, ParameterValue]
+GroupParameterDict = Dict[str, ParameterDict]
+ModelParameterDict = Dict[str, Union[ParameterDict, GroupParameterDict]]
 
 
 class ModelParameters:
-    def __init__(self, prior_dict: PriorDict):
+    def __init__(self, prior_dict: ModelParameterPriorDict):
         """
         Initialize the calibration model parameters.
         :param kernel_config: A dictionary containing the kernel configuration.
@@ -107,23 +136,32 @@ class ModelParameters:
         self.priors_flat, self.priors_tree = jax.tree.flatten(self.priors)
         self.n_params = len(self.priors_flat)
 
-        self.prior_log_prob_funcs: List[Callable[[Float], Float]] = jax.tree.map(
+        # self.prior_log_prob_funcs: List[
+        #     Callable[[jaxtyping.Float[Array, "..."]], jaxtyping.Float[Array, ""]]
+        # ] = jax.tree.map(lambda dist: jax.jit(dist.log_prob), self.priors_flat)
+        self.prior_log_prob_funcs = jax.tree.map(
             lambda dist: jax.jit(dist.log_prob), self.priors_flat
         )
 
-    def constrain_sample(self, samples_flat):
+    def constrain_sample(
+        self,
+        samples_flat,  #: ParameterArray
+    ):  # -> ParameterValueList:
         """
         Transform samples to the constrained space.
         Args:
             samples_flat: A flat JAX array of samples.
         Returns:
-            A tree of samples in the constrained space.
+            A list of samples transformed to the constrained space.
         """
         return [
             prior.forward(samples_flat[i]) for i, prior in enumerate(self.priors_flat)
         ]
 
-    def unflatten_sample(self, samples_flat) -> SampleDict:
+    def unflatten_sample(
+        self,
+        samples_flat,  #: ParameterValueList
+    ) -> ModelParameterDict:
         """
         Unflatten the samples to the original prior tree structure.
         Args:
@@ -134,7 +172,10 @@ class ModelParameters:
         # Unflatten the samples to the original tree structure
         return jax.tree.unflatten(self.priors_tree, samples_flat)
 
-    def constrain_and_unflatten_sample(self, samples_flat) -> SampleDict:
+    def constrain_and_unflatten_sample(
+        self,
+        samples_flat,  #: ParameterArray
+    ) -> ModelParameterDict:
         """
         Transform samples to the constrained space and unflatten them to the original prior tree structure.
         Args:
@@ -146,7 +187,9 @@ class ModelParameters:
         constrained_samples = self.constrain_sample(samples_flat)
         return self.unflatten_sample(constrained_samples)
 
-    def get_log_prior_func(self) -> Callable[[List], Float]:
+    def get_log_prior_func(
+        self,
+    ):  # -> Callable[[ParameterValueList], jaxtyping.Float[Array, ""]]:
         """Compute the joint log prior probability.
 
         Returns:
@@ -154,7 +197,9 @@ class ModelParameters:
         """
 
         @jax.jit
-        def log_prior_func(unconstrained_params_flat: List) -> Float:
+        def log_prior_func(
+            unconstrained_params_flat: ParameterValueList,
+        ):  # -> jaxtyping.Float[Array, ""]:
             """
             Compute the joint log prior probability.
             Args:
@@ -172,7 +217,7 @@ class ModelParameters:
         return log_prior_func
 
 
-def _check_prior_dict(prior_dict: PriorDict):
+def _check_prior_dict(prior_dict: ModelParameterPriorDict) -> None:
     """
     Check if the kernel config is valid.
     """
