@@ -7,14 +7,13 @@ name = "kohgpjax"
 dynamic = ["version"]
 description = "Kennedy & O'Hagan Bayesian calibration framework written in JAX and GPJax"
 readme = "README.md"
-requires-python = ">=3.10, <3.13" # Match GPJax range for safety
+requires-python = ">=3.11, <3.13" # Match GPJax range for safety
 license = { text = "MIT" }
 keywords = ["gaussian-processes", "jax", "machine-learning", "bayesian", "calibration", "kennedy-ohagan"]
 authors = [{ name = "James Briant", email = "james.briant.21@ucl.ac.uk" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: Implementation :: CPython",
@@ -50,7 +49,7 @@ path = "kohgpjax/__init__.py"
 
 [tool.hatch.envs.default]
 installer = "uv"
-python = "3.10"
+python = "3.11"
 
 [tool.hatch.envs.dev]
 dependencies = [
@@ -101,7 +100,7 @@ all-tests = ['check']
 
 [tool.black]
 line-length = 88
-target-version = ["py310"]
+target-version = ["py311"]
 
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::DeprecationWarning"]
@@ -114,7 +113,7 @@ cache-dir = "~/.cache/ruff"
 exclude = ["docs/", "examples/"]
 line-length = 88
 src = ["kohgpjax", "tests"]
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 dummy-variable-rgx = "^_$"
@@ -175,7 +174,6 @@ skip_covered = true
 env_list = [
     "py311",
     "py312",
-    "py313",
 ]
 env_run_base = {commands = [
     [
@@ -197,4 +195,3 @@ env.docs = {commands = [
 ]}
 gh.python."3.11" = ["py311"]
 gh.python."3.12" = ["py312"]
-gh.python."3.13" = ["py313"]
