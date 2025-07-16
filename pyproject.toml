@@ -29,6 +29,16 @@ dependencies = [
   "jaxtyping",
   "numpyro",
 ]
+optional-dependencies = {docs = [
+    "mkdocs",
+    "mkdocs-include-markdown-plugin",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mkdocstrings-python",
+], test = [
+    "pytest",
+    "pytest-cov",
+]}
 
 [project.urls]
 Documentation = "https://github.com/jamesbriant/koh-gpjax"
@@ -160,3 +170,31 @@ fail_under = 70
 precision = 1
 show_missing = true
 skip_covered = true
+
+[tool.tox]
+env_list = [
+    "py311",
+    "py312",
+    "py313",
+]
+env_run_base = {commands = [
+    [
+        "pytest",
+        "--cov",
+        "--cov-report=xml",
+    ],
+], extras = [
+    "test",
+]}
+env.docs = {commands = [
+    [
+        "mkdocs",
+        "build",
+        "--strict",
+    ],
+], extras = [
+    "docs",
+]}
+gh.python."3.11" = ["py311"]
+gh.python."3.12" = ["py312"]
+gh.python."3.13" = ["py313"]

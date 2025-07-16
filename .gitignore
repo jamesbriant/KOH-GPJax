@@ -12,3 +12,6 @@ coverage.xml
 environment.yml
 *.npz
 *.npy
+
+.tox
+site/
