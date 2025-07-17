@@ -1,14 +1,12 @@
-from jax import (  # Removed 'config'
-    jit,
-    numpy as jnp,
-)
 import jax.tree_util as jtu
 import numpyro.distributions as npd
-from numpyro.distributions import (  # npt is used in a commented out section, but might be useful. Keeping for now.
-    transforms as npt,
-)
 import pytest
-
+from jax import (  # Removed 'config'
+    jit,
+)
+from jax import (
+    numpy as jnp,
+)
 from kohgpjax.parameters import (
     ModelParameterDict,
     ModelParameters,
@@ -88,7 +86,7 @@ def assert_trees_equal(tree1, tree2, rtol=1e-7, atol=1e-9):
     assert treedef1 == treedef2, (
         f"Tree structures do not match: {treedef1} vs {treedef2}"
     )
-    for i, (v1, v2) in enumerate(zip(flat1, flat2)):
+    for i, (v1, v2) in enumerate(zip(flat1, flat2, strict=False)):
         assert jnp.allclose(v1, v2, rtol=rtol, atol=atol), (
             f"Leaf {i} mismatch: {v1} vs {v2}"
         )
@@ -172,34 +170,34 @@ def test_unflatten_sample(
 
     # Based on JAX's alphabetical key sorting for flattening:
     # delta -> epsilon -> eta -> thetas
-    expected_unflattened = {
-        "delta": {
-            "lengthscales": {
-                "ls_x": mcmc_sample_unconstrained[0]
-            },  # sorted: lengthscales before variances
-            "variances": {"kernel_var": mcmc_sample_unconstrained[1]},
-        },
-        "epsilon": {
-            "variances": {"obs_noise": mcmc_sample_unconstrained[2]},
-        },
-        "eta": {
-            "lengthscales": {  # sorted: ls_theta before ls_x if keys are "ls_theta", "ls_x"
-                # if keys are "ls_x", "ls_theta", then order is x then theta.
-                # valid_prior_dict has ls_x then ls_theta
-                "ls_theta": mcmc_sample_unconstrained[
-                    4
-                ],  # ls_theta is dict key, ls_x is dict key.
-                "ls_x": mcmc_sample_unconstrained[
-                    3
-                ],  # JAX sorts these keys: ls_theta, ls_x. So sample[3] is for ls_theta, sample[4] for ls_x
-            },
-            "variances": {"kernel_var": mcmc_sample_unconstrained[5]},
-        },
-        "thetas": {  # sorted: calib_param1 before calib_param2
-            "calib_param1": mcmc_sample_unconstrained[6],
-            "calib_param2": mcmc_sample_unconstrained[7],
-        },
-    }
+    # expected_unflattened = {
+    #     "delta": {
+    #         "lengthscales": {
+    #             "ls_x": mcmc_sample_unconstrained[0]
+    #         },  # sorted: lengthscales before variances
+    #         "variances": {"kernel_var": mcmc_sample_unconstrained[1]},
+    #     },
+    #     "epsilon": {
+    #         "variances": {"obs_noise": mcmc_sample_unconstrained[2]},
+    #     },
+    #     "eta": {
+    #         "lengthscales": {  # sorted: ls_theta before ls_x if keys are "ls_theta", "ls_x"
+    #             # if keys are "ls_x", "ls_theta", then order is x then theta.
+    #             # valid_prior_dict has ls_x then ls_theta
+    #             "ls_theta": mcmc_sample_unconstrained[
+    #                 4
+    #             ],  # ls_theta is dict key, ls_x is dict key.
+    #             "ls_x": mcmc_sample_unconstrained[
+    #                 3
+    #             ],  # JAX sorts these keys: ls_theta, ls_x. So sample[3] is for ls_theta, sample[4] for ls_x
+    #         },
+    #         "variances": {"kernel_var": mcmc_sample_unconstrained[5]},
+    #     },
+    #     "thetas": {  # sorted: calib_param1 before calib_param2
+    #         "calib_param1": mcmc_sample_unconstrained[6],
+    #         "calib_param2": mcmc_sample_unconstrained[7],
+    #     },
+    # }
     # Re-evaluating order for eta.lengthscales based on valid_prior_dict:
     # "ls_x": ParameterPrior(npd.Normal(-1,1)),      # param_idx: 3 in its group
     # "ls_theta": ParameterPrior(npd.Normal(0.5,0.25)),# param_idx: 4 in its group

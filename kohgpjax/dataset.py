@@ -1,13 +1,9 @@
 from dataclasses import dataclass
 
-from gpjax.dataset import Dataset
-from gpjax.typing import (
-    Array,
-    ScalarInt,
-)
 import jax.numpy as jnp
+from gpjax.dataset import Dataset
+from gpjax.typing import Array
 from jax.tree_util import register_pytree_node_class
-from jaxtyping import Float
 
 
 @dataclass

@@ -1,12 +1,11 @@
+import jax.numpy as jnp
+import pytest
 from gpjax.kernels import (
     RBF,
     White,
 )
 from jax import jit
-import jax.numpy as jnp
 from jax.scipy.linalg import block_diag
-import pytest
-
 from kohgpjax.kernels.computations.kohcomputation import KOHKernelComputation
 from kohgpjax.kernels.kohkernel import KOHKernel
 
@@ -191,7 +190,7 @@ def test_kohkernelcomputation_cross_covariance_values(setup_computation_test):
     # due to the current padding logic in the source code.
     X_generic1 = s["X1"]
     # Re-create an X_generic2 that has M != N for this specific check, as fixture X2 might now have M=N
-    n_field_obs_s, n_sim_obs_s, dim_k_eta_inputs_s = (
+    n_field_obs_s, _, dim_k_eta_inputs_s = (
         s["n_field_obs"],
         kernel.num_sim_obs,
         X_generic1.shape[1],
