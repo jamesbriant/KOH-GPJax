@@ -89,7 +89,7 @@ plugins:
   - include-markdown:
       opening_tag: "{!"
       closing_tag: "!}"
-  - git-authors
+  # - git-authors
 
 extra:
   social:
