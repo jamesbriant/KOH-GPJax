@@ -8,6 +8,8 @@ on:
 
 jobs:
   docs:
+    permissions:
+      contents: write # Required to publish documentation to GitHub Pages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
