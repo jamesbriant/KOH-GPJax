@@ -30,10 +30,14 @@ dependencies = [
 ]
 optional-dependencies = {docs = [
     "mkdocs",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
     "mkdocs-include-markdown-plugin",
     "mkdocs-material",
     "mkdocstrings",
     "mkdocstrings-python",
+    "mkdocs-git-authors-plugin",
+    "pymdown-extensions",
 ], test = [
     "pytest",
     "pytest-cov",
@@ -71,7 +75,7 @@ dependencies = [
   "pytest-beartype",
   "autoflake",
 ]
-python = "3.10"
+python = "3.11"
 
 [tool.hatch.envs.dev.scripts]
 # Formatters
