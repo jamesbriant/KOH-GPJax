@@ -1,4 +1,5 @@
 import beartype.typing as tp
+import jax.numpy as jnp
 from cola.annotations import PSD
 from cola.linalg.inverse.inv import solve
 from cola.ops import Dense
@@ -18,9 +19,6 @@ from gpjax.likelihoods import (
     NonGaussian,
 )
 from gpjax.mean_functions import AbstractMeanFunction
-from gpjax.typing import Array
-import jax.numpy as jnp
-from jaxtyping import Num
 
 from kohgpjax.kernels.kohkernel import KOHKernel
 

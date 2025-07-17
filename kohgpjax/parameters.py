@@ -1,3 +1,10 @@
+import jax
+import jax.numpy as jnp
+
+# from jaxtyping import Float  # Changed from 'from jaxtyping import Float'
+import jaxtyping
+import numpyro.distributions as npd
+import numpyro.distributions.transforms as npt
 from beartype.typing import (
     Callable,
     Dict,
@@ -9,11 +16,6 @@ from gpjax.typing import (
     Array,
     ScalarFloat,
 )
-import jax
-import jax.numpy as jnp
-from jaxtyping import Float  # Changed from 'from jaxtyping import Float'
-import numpyro.distributions as npd
-import numpyro.distributions.transforms as npt
 
 # from typing import (
 #     Callable,
@@ -111,7 +113,7 @@ GroupParameterPriorDict = Dict[str, ParameterPriorDict]
 ModelParameterPriorDict = Dict[str, Union[ParameterPriorDict, GroupParameterPriorDict]]
 
 ParameterValue = ScalarFloat  # A single parameter value
-ParameterArray = Float[Array, "Nparams"]
+ParameterArray = jaxtyping.Float[Array, "..."]
 ParameterValueList = List[ParameterValue]  # A list of parameter values
 ParameterDict = Dict[str, ParameterValue]
 GroupParameterDict = Dict[str, ParameterDict]
@@ -189,7 +191,7 @@ class ModelParameters:
 
     def get_log_prior_func(
         self,
-    ):  # -> Callable[[ParameterValueList], jaxtyping.Float[Array, ""]]:
+    ) -> Callable[[ParameterValueList], jaxtyping.Scalar]:
         """Compute the joint log prior probability.
 
         Returns:
@@ -199,7 +201,7 @@ class ModelParameters:
         @jax.jit
         def log_prior_func(
             unconstrained_params_flat: ParameterValueList,
-        ):  # -> jaxtyping.Float[Array, ""]:
+        ) -> jaxtyping.Scalar:
             """
             Compute the joint log prior probability.
             Args:

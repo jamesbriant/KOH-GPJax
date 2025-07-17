@@ -1,13 +1,14 @@
 import gpjax as gpx  # Using gpx alias for gpjax
+import numpyro.distributions as npd
+import pytest
 from gpjax.dataset import Dataset  # Corrected import
 from gpjax.parameters import Static  # Explicit import for Static
 from jax import (  # Removed 'config'
     jit,
+)
+from jax import (
     numpy as jnp,
 )
-import numpyro.distributions as npd
-import pytest
-
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import KOHPosterior  # Assuming this is the correct import path
 from kohgpjax.kernels.kohkernel import KOHKernel

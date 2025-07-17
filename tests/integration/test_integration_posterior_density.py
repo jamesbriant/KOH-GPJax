@@ -3,14 +3,15 @@ from jax import config  # Re-adding config for early x64 enabling
 config.update("jax_enable_x64", True)  # Needs to be before JAX ops at global scope
 
 import gpjax as gpx
-from jax import (
-    jit,
-    numpy as jnp,
-)
 
 # import numpy as np # No longer needed for np.loadtxt
 import numpyro.distributions as npd
-
+from jax import (
+    jit,
+)
+from jax import (
+    numpy as jnp,
+)
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.kohmodel import KOHModel
 from kohgpjax.parameters import (

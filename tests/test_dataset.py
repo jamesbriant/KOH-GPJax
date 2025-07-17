@@ -1,7 +1,6 @@
+import pytest
 from gpjax.dataset import Dataset
 from jax import numpy as jnp  # Removed 'config'
-import pytest
-
 from kohgpjax.dataset import KOHDataset
 
 # --- Fixtures ---

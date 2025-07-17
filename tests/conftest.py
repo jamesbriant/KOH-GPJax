@@ -1,6 +1,6 @@
-from jax import config
 import jax.random as jr
 import pytest
+from jax import config
 
 
 @pytest.fixture(autouse=True)

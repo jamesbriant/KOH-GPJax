@@ -1,16 +1,13 @@
 from abc import abstractmethod
-from typing import (
-    Callable,
-    Dict,
-)
+from typing import Callable
 
 import beartype.typing as tp
-from flax import nnx
 import gpjax as gpx
-from gpjax.typing import Array  # Added
-from jax.experimental import checkify
 import jax.numpy as jnp
 import jaxtyping  # Changed from 'from jaxtyping import Float'
+from flax import nnx
+from gpjax.typing import Array  # Added
+from jax.experimental import checkify
 
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.gps import (
@@ -20,7 +17,7 @@ from kohgpjax.gps import (
 from kohgpjax.kernels.kohkernel import KOHKernel
 from kohgpjax.parameters import (
     ModelParameterDict,
-    ModelParameters,
+    ModelParameters,  # noqa: F401
 )
 
 MP = tp.TypeVar("MP", bound="ModelParameters")
@@ -194,15 +191,15 @@ class KOHModel(nnx.Module):
 
     def get_KOH_neg_log_pos_dens_func(
         self,
-    ) -> Callable[..., jaxtyping.Float[Array, ""]]:
+    ) -> Callable[..., jaxtyping.Scalar]:
         """Returns a function which calculates the negative log posterior density of the model."""
         log_like_func = gpx.objectives.conjugate_mll
         # Type of log_prior_func: Callable[[List[jaxtyping.Float[Array, "..."]]], jaxtyping.Float[Array, ""]]
         log_prior_func = self.model_parameters.get_log_prior_func()
 
         def neg_log_pos_dens(
-            params_unconstrained_flat: jaxtyping.Float[Array, "Nparams"],
-        ) -> jaxtyping.Float[Array, ""]:  # Assuming flat array input
+            params_unconstrained_flat: jaxtyping.Float[Array, "..."],
+        ) -> jaxtyping.Scalar:  # Assuming flat array input
             # log_prior_func expects a List of arrays/scalars.
             # If params_unconstrained_flat is a single flat array, it needs to be converted to List[Scalar JAX array]
             # This was handled in ModelParameters by tree_map. Here, let's assume params_unconstrained_flat is already a list
@@ -233,8 +230,8 @@ class KOHModel(nnx.Module):
             return neg_log_like - log_prior
 
         def nlpd_checkified(
-            params_unconstrained_flat: jaxtyping.Float[Array, "Nparams"],
-        ) -> jaxtyping.Float[Array, ""]:
+            params_unconstrained_flat: jaxtyping.Float[Array, "..."],
+        ) -> jaxtyping.Scalar:
             error, value = checkify.checkify(neg_log_pos_dens)(
                 params_unconstrained_flat
             )

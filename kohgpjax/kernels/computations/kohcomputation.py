@@ -5,7 +5,6 @@ from gpjax.kernels.computations.base import AbstractKernelComputation
 from gpjax.typing import Array
 from jax.numpy import pad
 from jax.scipy.linalg import block_diag
-from jaxtyping import Float
 
 K = tp.TypeVar("K", bound="AbstractKernel")  # noqa: F821
 

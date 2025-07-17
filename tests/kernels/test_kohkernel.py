@@ -1,10 +1,9 @@
+import jax.numpy as jnp
+import pytest
 from gpjax.kernels import (
     RBF,
     White,
 )
-import jax.numpy as jnp
-import pytest
-
 from kohgpjax.kernels.computations.kohcomputation import KOHKernelComputation
 from kohgpjax.kernels.kohkernel import KOHKernel
 

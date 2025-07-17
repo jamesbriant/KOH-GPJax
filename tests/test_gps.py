@@ -1,14 +1,17 @@
 import gpjax as gpx
+import pytest
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
 from gpjax.parameters import Static
 from jax import (  # Removed 'config'
     jit,
+)
+from jax import (
     numpy as jnp,
+)
+from jax import (
     tree_util as jtu,
 )
-import pytest
-
 from kohgpjax.gps import (
     KOHPosterior,
     construct_posterior,
