@@ -1,3 +1,0 @@
-# `kohgpjax.dataset`
-
-::: kohgpjax.dataset

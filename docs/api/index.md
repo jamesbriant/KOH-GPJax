@@ -1,3 +1,0 @@
-# `kohgpjax`
-
-::: kohgpjax
