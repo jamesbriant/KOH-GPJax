@@ -1,0 +1,106 @@
+site_name: "KOH-GPJax"
+site_description: "Documentation website for KOH-GPJax"
+site_author: "James Briant"
+copyright: "Copyright © 2025 James Briant"
+repo_url: "https://github.com/jamesbriant/koh-gpjax/"
+repo_name: "jamesbriant/KOH-GPJax"
+edit_uri: edit/main/docs/
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+
+theme:
+  name: "material"
+  features:
+    - content.action.edit
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top # Show a back to top button
+    - content.code.copy
+    - search.suggest # Show search suggestions
+    - search.highlight # Highlight search results in results
+    - content.code.annotate # Allow individual lines of code to be annotated
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Overview: index.md
+  # - Installation: installation.md
+  # - Getting Started: getting-started.md
+  # - Tutorials: tutorials/
+  # - Examples: examples/
+  - API Reference: api/
+  - License: LICENSE.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic : true
+  - footnotes
+
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - docs/scripts/gen_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          inventories:
+            - "https://docs.python.org/3/objects.inv"
+          options:
+            docstring_style: google
+            docstring_section_style: list
+            show_submodules: false
+            merge_init_into_class: true
+          paths: [kohgpjax]
+  - include-markdown:
+      opening_tag: "{!"
+      closing_tag: "!}"
+  - git-authors
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: "https://github.com/jamesbriant"
+
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://unpkg.com/katex@0/dist/katex.min.css

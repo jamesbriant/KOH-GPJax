@@ -1,0 +1,201 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kohgpjax"
+dynamic = ["version"]
+description = "Kennedy & O'Hagan Bayesian calibration framework written in JAX and GPJax"
+readme = "README.md"
+requires-python = ">=3.11, <3.13" # Match GPJax range for safety
+license = { text = "MIT" }
+keywords = ["gaussian-processes", "jax", "machine-learning", "bayesian", "calibration", "kennedy-ohagan"]
+authors = [{ name = "James Briant", email = "james.briant.21@ucl.ac.uk" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "beartype",
+  "cola-ml",
+  "flax",
+  "gpjax>0.11.0",
+  "jax",
+  "jaxtyping",
+  "numpyro",
+]
+optional-dependencies = {docs = [
+    "mkdocs",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-include-markdown-plugin",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mkdocstrings-python",
+    "mkdocs-git-authors-plugin",
+    "pymdown-extensions",
+], test = [
+    "pytest",
+    "pytest-cov",
+]}
+
+[project.urls]
+Documentation = "https://github.com/jamesbriant/koh-gpjax"
+Issues = "https://github.com/jamesbriant/koh-gpjax/issues"
+Source = "https://github.com/jamesbriant/koh-gpjax"
+
+[tool.hatch.version]
+path = "kohgpjax/__init__.py"
+
+[tool.hatch.envs.default]
+installer = "uv"
+python = "3.11"
+
+[tool.hatch.envs.dev]
+dependencies = [
+  "ruff>=0.6",
+  "pre-commit>=3.2.2",
+  "interrogate>=1.5.0",
+  "codespell>=2.2.4",
+  "pytest>=7.2.2",
+  "pytest-cov>=4.0.0",
+  "pytest-pretty>=1.1.1",
+  "pytest-xdist>=3.2.1",
+  "coverage>=7.2.2",
+  "absolufy-imports>=0.3.1",
+  "xdoctest>=1.1.1",
+  "mktestdocs>=0.2.1",
+  "isort",
+  "black",
+  "jupytext",
+  "pytest-beartype",
+  "autoflake",
+]
+python = "3.11"
+
+[tool.hatch.envs.dev.scripts]
+# Formatters
+black-format = ["black ./kohgpjax ./tests", "jupytext --pipe black examples/*.py || true"]
+black-check = "black --check --diff ./kohgpjax ./tests"
+imports-format = [
+  "isort ./kohgpjax ./tests",
+  "isort examples/*.py --treat-comment-as-code '# %%' --float-to-top || true",
+]
+imports-check = [
+  "isort ./kohgpjax ./tests -c",
+  "isort examples/*.py -c --treat-comment-as-code '# %%' --float-to-top || true",
+]
+lint-format = ['ruff format ./kohgpjax ./tests ./examples || true']
+lint-check = ['ruff check --fix ./kohgpjax ./tests ./examples || true']
+format = ["black-format", "imports-format", "lint-format"]
+check = ["black-check", "imports-check", "lint-check"]
+remove-unused = ["autoflake --remove-unused-variables --remove-all-unused-imports --recursive ./kohgpjax ./tests"]
+
+# Testing
+test = "pytest . -v -n 4 --beartype-packages='kohgpjax'"
+coverage = "pytest . -v --cov=./kohgpjax --cov-report=xml:./coverage.xml"
+docstrings = "xdoctest ./kohgpjax"
+# all-tests = ['check', 'docstrings', 'test'] # TODO: Turn these tests back on when ready
+all-tests = ['check']
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["error", "ignore::DeprecationWarning"]
+testpaths = ["tests"]
+xfail_strict = true
+
+[tool.ruff]
+fix = true
+cache-dir = "~/.cache/ruff"
+exclude = ["docs/", "examples/"]
+line-length = 88
+src = ["kohgpjax", "tests"]
+target-version = "py311"
+
+[tool.ruff.lint]
+dummy-variable-rgx = "^_$"
+select = [
+  "F", "E", "W", "YTT", "B", "Q", "PLE", "PLR", "PLW", "PIE", "PYI", "TID", "ISC"
+]
+ignore = [
+  "B008", "E402", "E731", "E501", "S303", "S307", "RET504", "S101", "F722", "PLR2004", "PLR0913"
+]
+unfixable = ["ERA001", "F401", "F841", "T201", "T203"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"kohgpjax/__init__.py" = ['I', 'F401', 'E402', 'D104']
+
+[tool.isort]
+profile = "black"
+combine_as_imports = true
+force_sort_within_sections = true
+force_grid_wrap = 2
+skip = 'examples'
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+fail-under = 80
+exclude = [
+  "setup.py",
+  "docs",
+  "tests",
+  "kohgpjax/__init__.py",
+]
+verbose = 2
+quiet = false
+color = true
+
+[tool.coverage.run]
+# source_pkgs = ["kohgpjax", "tests"] # TODO: Turn back on when ready
+source_pkgs = ["kohgpjax"]
+branch = true
+parallel = true
+omit = ["kohgpjax/__init__.py"]
+
+[tool.coverage.paths]
+kohgpjax = ["kohgpjax", "*/kohgpjax/"]
+# tests = ["tests", "*/kohgpjax/tests"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+fail_under = 70
+precision = 1
+show_missing = true
+skip_covered = true
+
+[tool.tox]
+env_list = [
+    "py311",
+    "py312",
+]
+env_run_base = {commands = [
+    [
+        "pytest",
+        "--cov",
+        "--cov-report=xml",
+    ],
+], extras = [
+    "test",
+]}
+env.docs = {commands = [
+    [
+        "mkdocs",
+        "build",
+        "--strict",
+    ],
+], extras = [
+    "docs",
+]}
+gh.python."3.11" = ["py311"]
+gh.python."3.12" = ["py312"]
