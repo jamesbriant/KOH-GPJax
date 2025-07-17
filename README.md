@@ -210,7 +210,7 @@ print("NLPD Gradient:", nlpd_gradient)
 
 ## Development Setup with Hatch
 
-This project uses [Hatch](https://hatch.pypa.io/latest/) for dependency management and running development tasks.
+This project uses [Hatch](https://hatch.pypa.io/latest/) for dependency management and running development tasks, with [Ruff](https://docs.astral.sh/ruff/) for code formatting and linting.
 
 1. **Install Hatch:**
     If you don't have Hatch installed, you can install it via pip:
@@ -246,33 +246,21 @@ This project uses [Hatch](https://hatch.pypa.io/latest/) for dependency manageme
         hatch run dev:test
         ```
 
-    * **Check linting and formatting (all checks):**
+    * **Check linting and formatting:**
 
         ```bash
         hatch run dev:check
         ```
 
-        Or, to run individual checks:
+        This runs `ruff check --fix` to check and automatically fix linting issues, import sorting, and remove unused variables.
 
-        ```bash
-        hatch run dev:lint-check
-        hatch run dev:black-check
-        hatch run dev:imports-check
-        ```
-
-    * **Apply formatting (all formatters):**
+    * **Apply formatting:**
 
         ```bash
         hatch run dev:format
         ```
 
-        Or, to run individual formatters:
-
-        ```bash
-        hatch run dev:lint-format
-        hatch run dev:black-format
-        hatch run dev:imports-format
-        ```
+        This runs `ruff format` on the codebase and formats Jupyter notebooks using `jupytext`.
 
     * **Run all checks and tests:**
 
@@ -288,6 +276,12 @@ This project uses [Hatch](https://hatch.pypa.io/latest/) for dependency manageme
         ```
 
         Then, you can open `htmlcov/index.html` in your browser, or view the XML report in `coverage.xml`.
+
+    * **Check docstrings:**
+
+        ```bash
+        hatch run dev:docstrings
+        ```
 
 Refer to the `[tool.hatch.envs.dev.scripts]` section in `pyproject.toml` for all available scripts.
 
