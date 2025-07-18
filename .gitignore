@@ -4,7 +4,6 @@ build/
 .pytest_cache/
 
 kohgpjax.egg-info/
-data/
 
 .coverage*
 coverage.xml
