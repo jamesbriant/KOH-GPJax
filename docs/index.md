@@ -13,6 +13,8 @@ parameter prior definitions and a posterior sampler. KOH-GPJax provides the infr
 to build the Bayesian model using the first two components provided by the user and
 exposes a log posterior density function for the MCMC sampler of your choosing.
 
+The data for this problem can be found in `examples/data/`.
+
 === "`main.py`"
     ```py
     import jax.numpy as jnp
