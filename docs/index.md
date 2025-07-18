@@ -1,10 +1,10 @@
 # Welcome to KOH-GPJax
 
 KOH-GPJax is a modern Python implementation of the Bayesian Calibration
-of Computer Models framework first outlined by Kennedy & O'Hagan (2001)[^1].
+of Computer Models framework first outlined by [Kennedy & O'Hagan (2001) [external]](https://doi.org/10.1111/1467-9868.00294)[^1].
 This package inherits the GPU acceleration and just-in-time compilation
-features of JAX and builds upon the flexible yet elegant Gaussian processes package
-GPJax.
+features of [JAX [external]](https://docs.jax.dev/en/latest/index.html) and builds upon the flexible yet elegant Gaussian processes package
+[GPJax [external]](https://docs.jaxgaussianprocesses.com).
 
 ## Basic Example
 
