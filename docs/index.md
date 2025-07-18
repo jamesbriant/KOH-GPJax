@@ -3,7 +3,7 @@
 KOH-GPJax is a modern Python implementation of the Bayesian Calibration
 of Computer Models framework first outlined by Kennedy & O'Hagan (2001)[^1].
 This package inherits the GPU acceleration and just-in-time compilation
-features of JAX and the flexible yet elegant Gaussian processes package
+features of JAX and build upon the flexible yet elegant Gaussian processes package
 GPJax.
 
 ## Basic Example
@@ -99,7 +99,7 @@ The data for this problem can be found in `examples/data/`.
                 variance=jnp.array(1 / params["variances"]["precision"]),
             )
 
-        # k_epsilon_eta is completely optional. Default behaviour if a white kernel with
+        # k_epsilon_eta is completely optional. Default behaviour is a white kernel with
         # variance=0 effectively turning off this component.
         # def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
         #     params = params_constrained['epsilon_eta']
