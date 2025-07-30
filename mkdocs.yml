@@ -47,7 +47,7 @@ nav:
   - Installation: installation.md
   # - Getting Started: getting-started.md
   # - Tutorials: tutorials/
-  # - Examples: examples/
+  - Examples: _examples/
   - API Reference: api/
   - License: LICENSE.md
 
