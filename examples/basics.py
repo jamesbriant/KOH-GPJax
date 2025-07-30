@@ -80,20 +80,19 @@ class OurModel(KOHModel):
             active_dims=[0],
             variance=jnp.array(1 / params["variances"]["precision"]),
         )
-    
+
     # def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
     #     params = params_constrained["epsilon_eta"]
     #     return gpx.kernels.White(
     #         active_dims=[1],
     #         variance=jnp.array(1 / params["variances"]["precision"]),
     #     )
-    
+
 
 # %% [markdown]
 # ## Step 2: Define the priors
 # %%
 import numpyro.distributions as dist
-
 from kohgpjax.parameters import ModelParameterPriorDict, ParameterPrior
 
 prior_dict: ModelParameterPriorDict = {
@@ -158,8 +157,8 @@ prior_dict: ModelParameterPriorDict = {
 # %%
 from kohgpjax.dataset import KOHDataset
 
-DATAFIELD = np.loadtxt('data/field.csv', delimiter=',', dtype=np.float32)
-DATASIM = np.loadtxt('data/sim.csv', delimiter=',', dtype=np.float32)
+DATAFIELD = np.loadtxt("data/field.csv", delimiter=",", dtype=np.float32)
+DATASIM = np.loadtxt("data/sim.csv", delimiter=",", dtype=np.float32)
 
 xf = jnp.reshape(DATAFIELD[:, 0], (-1, 1)).astype(jnp.float64)
 xc = jnp.reshape(DATASIM[:, 0], (-1, 1)).astype(jnp.float64)
@@ -177,14 +176,14 @@ print(kohdataset)
 import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots(1, 1)
-ax.scatter(xf, yf, label='Observations')
+ax.scatter(xf, yf, label="Observations")
 rng = np.random.default_rng()
 ts = rng.permutation(np.unique(tc))[:5]
 for t in ts:
     rows = tc==t
-    ax.plot(xc[rows], yc[rows], '--', label=f'Simulator t={t:.2f}')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
+    ax.plot(xc[rows], yc[rows], "--", label=f"Simulator t={t:.2f}")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
 ax.legend()
 plt.show()
 
@@ -195,7 +194,6 @@ plt.show()
 
 # %%
 from jax import grad, jit
-
 from kohgpjax.parameters import ModelParameters
 
 model_parameters = ModelParameters(prior_dict=prior_dict)
