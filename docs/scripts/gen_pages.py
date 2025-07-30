@@ -1,10 +1,15 @@
+import dataclasses
+# import subprocess
 from pathlib import Path
+from typing import Iterable, Mapping, Union
 
 import mkdocs_gen_files
 from mkdocs_gen_files import Nav
-from typing import Iterable, Mapping, Union
-import dataclasses
 
+# ### Call `gen_examples.py` to generate example markdown files
+# subprocess.run(
+#     ["python", "docs/scripts/gen_examples.py"],
+# )
 
 class CustomNav(Nav):
     def __init__(self):

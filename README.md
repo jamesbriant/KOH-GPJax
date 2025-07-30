@@ -30,37 +30,38 @@ import gpjax as gpx
 import jax.numpy as jnp
 from kohgpjax.kohmodel import KOHModel
 
-class Model(KOHModel):
-    def k_eta(self, eta_params_constrained):
+class OurModel(KOHModel):
+    def k_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        params = params_constrained["eta"]
         return gpx.kernels.ProductKernel(
             kernels=[
                 gpx.kernels.RBF(
                     active_dims=[0],
-                    lengthscale=jnp.array(eta_params_constrained['lengthscales']['x_0']),
-                    variance=jnp.array(1 / eta_params_constrained['variances']['variance']),
+                    lengthscale=jnp.array(params["lengthscales"]["x_0"]),
+                    variance=jnp.array(1 / params["variances"]["precision"]),
                 ),
                 gpx.kernels.RBF(
                     active_dims=[1],
-                    lengthscale=jnp.array(eta_params_constrained['lengthscales']['theta_0']),
+                    lengthscale=jnp.array(params["lengthscales"]["theta_0"]),
+                    # variance=1.0, # This is not required as the variance is set to 1 by default
                 ),
             ]
         )
 
-    def k_delta(self, delta_params_constrained):
+    def k_delta(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        params = params_constrained["delta"]
         return gpx.kernels.RBF(
             active_dims=[0],
-            lengthscale=jnp.array(delta_params_constrained['lengthscales']['x_0']),
-            variance=jnp.array(1 / delta_params_constrained['variances']['variance']),
+            lengthscale=jnp.array(params["lengthscales"]["x_0"]),
+            variance=jnp.array(1 / params["variances"]["precision"]),
         )
 
-    # k_epsilon_eta is now optional. If not defined, a zero-variance white kernel is used.
-    # def k_epsilon_eta(self, epsilon_eta_params_constrained=None):
-    #     if epsilon_eta_params_constrained is None:
-    #         return None
-    #     return gpx.kernels.White(
-    #         active_dims=[0],
-    #         variance=jnp.array(1 / epsilon_eta_params_constrained['variances']['variance']),
-    #     )
+    def k_epsilon(self, params_constrained) -> gpx.kernels.AbstractKernel:
+        params = params_constrained["epsilon"]
+        return gpx.kernels.White(
+            active_dims=[0],
+            variance=jnp.array(1 / params["variances"]["precision"]),
+        )
 ```
 
 ### Step 2: Define the Priors
@@ -69,76 +70,57 @@ Define the prior distributions and bijectors for all model parameters. The `epsi
 
 ```python
 # filepath: /priors.py
-import distrax
-from kohgpjax.parameters import ParameterPrior, PriorDict
+import numpyro.distributions as dist
 
-prior_dict: PriorDict = {
-    'thetas': {
-        'theta_0': ParameterPrior(
-            distrax.Uniform(low=0.3, high=0.5),
-            distrax.Chain([
-                distrax.Inverse(distrax.Tanh()),
-                distrax.Lambda(lambda x: 2 * (x - 0.3) / (0.5 - 0.3) - 1),
-            ]),
-            name='theta_0',
+from kohgpjax.parameters import ModelParameterPriorDict, ParameterPrior
+
+prior_dict: ModelParameterPriorDict = {
+    "thetas": {
+        "theta_0": ParameterPrior(
+            dist.Uniform(low=0.3, high=0.5),
+            name="theta_0",
         ),
     },
-    'eta': {
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=1.0),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='eta_variance',
+    "eta": {
+        "variances": {
+            "precision": ParameterPrior(
+                dist.Gamma(concentration=2.0, rate=4.0),
+                name="eta_precision",
             ),
         },
-        'lengthscales': {
-            'x_0': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=1.0),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='eta_lengthscale_x_0',
+        "lengthscales": {
+            "x_0": ParameterPrior(
+                dist.Gamma(concentration=4.0, rate=1.4),
+                name="eta_lengthscale_x_0",
             ),
-            'theta_0': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=3.5),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='eta_lengthscale_theta_0',
+            "theta_0": ParameterPrior(
+                dist.Gamma(concentration=2.0, rate=3.5),
+                name="eta_lengthscale_theta_0",
             ),
         },
     },
-    'delta': {
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=10.0, rate=0.33),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='delta_variance',
+    "delta": {
+        "variances": {
+            "precision": ParameterPrior(
+                dist.Gamma(concentration=2.0, rate=0.1),
+                name="delta_precision",
             ),
         },
-        'lengthscales': {
-            'x_0': ParameterPrior(
-                distrax.Gamma(concentration=2.0, rate=1.0),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='delta_lengthscale_x_0',
+        "lengthscales": {
+            "x_0": ParameterPrior(
+                dist.Gamma(concentration=4.0, rate=2.0),
+                name="delta_lengthscale_x_0",
+            )
+        },
+    },
+    "epsilon": {
+        "variances": {
+            "precision": ParameterPrior(
+                dist.Gamma(concentration=12.0, rate=0.025),
+                name="epsilon_precision",
             ),
         },
     },
-    'epsilon': {
-        'variances': {
-            'variance': ParameterPrior(
-                distrax.Gamma(concentration=12.0, rate=0.025),
-                distrax.Lambda(lambda x: jnp.log(x)),
-                name='epsilon_variance',
-            ),
-        },
-    },
-    # 'epsilon_eta' is now optional and can be omitted if not needed.
-    # 'epsilon_eta': {
-    #     'variances': {
-    #         'variance': ParameterPrior(
-    #             distrax.Gamma(concentration=10.0, rate=0.001),
-    #             distrax.Lambda(lambda x: jnp.log(x)),
-    #             name='epsilon_eta_variance',
-    #         ),
-    #     },
-    # },
 }
 ```
 
@@ -181,6 +163,7 @@ Create an instance of the model with the priors and dataset, and compute the neg
 # filepath: /script.py
 from kohgpjax.parameters import ModelParameters
 from jax import jit, grad
+from jax import tree as jax_tree
 
 from priors import prior_dict
 from model import Model
@@ -199,13 +182,20 @@ nlpd_jitted = jit(nlpd_func)
 # Compute the gradient of the NLPD
 grad_nlpd_jitted = jit(grad(nlpd_func))
 
-# Example usage
-example_params = jnp.array([0.4, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-nlpd_value = nlpd_jitted(example_params)
-nlpd_gradient = grad_nlpd_jitted(example_params)
+# Get prior means
+prior_leaves, prior_tree = jax_tree.flatten(prior_dict)
+prior_means = jax_tree.map(
+    lambda x: x.inverse(x.distribution.mean), prior_leaves
+)
 
-print("NLPD Value:", nlpd_value)
-print("NLPD Gradient:", nlpd_gradient)
+# Calculate
+init_states = np.array(prior_means) # NOT jnp.array
+nlpd_value = nlpd_jitted(init_states)
+grad_nlpd_value = grad_nlpd_jitted(init_states)
+
+print("Initial states:", init_states)
+print("Negative log posterior density:", nlpd_value)
+print("Gradient of NLPD:", grad_nlpd_value)
 ```
 
 ## Development Setup with Hatch

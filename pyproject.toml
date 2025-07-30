@@ -24,7 +24,7 @@ dependencies = [
   "cola-ml",
   "flax",
   "gpjax>0.11.0",
-  "jax",
+  "jax<0.7",
   "jaxtyping",
   "numpyro",
 ]
@@ -36,6 +36,7 @@ optional-dependencies = {docs = [
     "mkdocs-material",
     "mkdocstrings",
     "mkdocstrings-python",
+    "mkdocs-jupyter",
     # "mkdocs-git-authors-plugin",
     "pymdown-extensions",
 ], test = [
@@ -54,6 +55,19 @@ path = "kohgpjax/__init__.py"
 [tool.hatch.envs.default]
 installer = "uv"
 python = "3.11"
+
+[tool.hatch.envs.docs]
+dependencies = [
+  "jupytext",
+  "ipykernel",
+  "ipywidgets",
+  "nbconvert",
+  "matplotlib",
+]
+python = "3.11"
+
+[tool.hatch.envs.docs.scripts]
+build = ["python docs/scripts/gen_examples.py --execute"]
 
 [tool.hatch.envs.dev]
 # Dependencies have been simplified. `ruff` handles formatting, linting, and import sorting.
@@ -100,9 +114,9 @@ xfail_strict = true
 [tool.ruff]
 fix = true
 cache-dir = "~/.cache/ruff"
-exclude = ["docs/"]
+exclude = ["docs/", "examples/"]
 line-length = 88
-src = ["kohgpjax", "tests", "examples"]
+src = ["kohgpjax", "tests"]
 target-version = "py311"
 
 [tool.ruff.format]
