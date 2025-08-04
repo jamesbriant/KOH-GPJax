@@ -34,8 +34,7 @@ from jax import config
 config.update("jax_enable_x64", True)
 
 
-# %%
-#
+# %% [markdown]
 # ## Step 1: Define the model
 #
 # Defining both `k_eta` and `k_delta` is required.
@@ -93,6 +92,7 @@ class OurModel(KOHModel):
 # ## Step 2: Define the priors
 # %%
 import numpyro.distributions as dist
+
 from kohgpjax.parameters import ModelParameterPriorDict, ParameterPrior
 
 prior_dict: ModelParameterPriorDict = {
@@ -194,6 +194,7 @@ plt.show()
 
 # %%
 from jax import grad, jit
+
 from kohgpjax.parameters import ModelParameters
 
 model_parameters = ModelParameters(prior_dict=prior_dict)

@@ -19,18 +19,14 @@ from jax import config
 config.update("jax_enable_x64", True)
 ```
 
+## Step 1: Define the model
 
-```python
-#
-# ## Step 1: Define the model
-#
-# Defining both `k_eta` and `k_delta` is required.
-# Defining `k_epsilon_eta` is completely optional - default behaviour sets variance to 0 effectively turning off this kernel.
-# Defining `k_epsilon` here is also optional. A white noise kernel is used by default but a prior definition must always be provided by the user. The kernel will search for the variance parameter prior under ['epsilon', 'variances', 'variance'] of the prior dictionary by default.
-#
-# In this example variances are defined as the inverse of a precision parameter.
-# This is inkeeping with Higdon et al. (2004).
-```
+Defining both `k_eta` and `k_delta` is required.
+Defining `k_epsilon_eta` is completely optional - default behaviour sets variance to 0 effectively turning off this kernel.
+Defining `k_epsilon` here is also optional. A white noise kernel is used by default but a prior definition must always be provided by the user. The kernel will search for the variance parameter prior under ['epsilon', 'variances', 'variance'] of the prior dictionary by default.
+
+In this example variances are defined as the inverse of a precision parameter.
+This is inkeeping with Higdon et al. (2004).
 
 
 ```python
@@ -69,7 +65,7 @@ class OurModel(KOHModel):
             active_dims=[0],
             variance=jnp.array(1 / params["variances"]["precision"]),
         )
-    
+
     # def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
     #     params = params_constrained["epsilon_eta"]
     #     return gpx.kernels.White(
@@ -150,8 +146,8 @@ prior_dict: ModelParameterPriorDict = {
 ```python
 from kohgpjax.dataset import KOHDataset
 
-DATAFIELD = np.loadtxt('data/field.csv', delimiter=',', dtype=np.float32)
-DATASIM = np.loadtxt('data/sim.csv', delimiter=',', dtype=np.float32)
+DATAFIELD = np.loadtxt("data/field.csv", delimiter=",", dtype=np.float32)
+DATASIM = np.loadtxt("data/sim.csv", delimiter=",", dtype=np.float32)
 
 xf = jnp.reshape(DATAFIELD[:, 0], (-1, 1)).astype(jnp.float64)
 xc = jnp.reshape(DATASIM[:, 0], (-1, 1)).astype(jnp.float64)
@@ -183,14 +179,14 @@ print(kohdataset)
 import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots(1, 1)
-ax.scatter(xf, yf, label='Observations')
+ax.scatter(xf, yf, label="Observations")
 rng = np.random.default_rng()
 ts = rng.permutation(np.unique(tc))[:5]
 for t in ts:
     rows = tc==t
-    ax.plot(xc[rows], yc[rows], '--', label=f'Simulator t={t:.2f}')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
+    ax.plot(xc[rows], yc[rows], "--", label=f"Simulator t={t:.2f}")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
 ax.legend()
 plt.show()
 ```
