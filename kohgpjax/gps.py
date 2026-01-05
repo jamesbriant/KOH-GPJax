@@ -293,6 +293,8 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
                 predictive distribution is evaluated.
             train_data (Dataset): A `gpx.Dataset` object that contains the input and
                 output data used for training dataset.
+            include_observation_noise (bool): Whether to include observation noise in the
+                predictive distribution.
 
         Returns
         -------
@@ -336,6 +338,86 @@ class KOHPosterior(AbstractPosterior[PKOH, GL]):
             include_observation_noise
         ):  # This cannot be jitted. TODO: Find a way to make this jittable.
             Ktt += self.prior.kernel.k_epsilon.cross_covariance(t, t)
+
+        # Kxx += I_like(Kxx) * self.jitter
+        # Σ = Kxx + Io²
+        Kxx += jnp.diag(
+            jnp.pad(
+                jnp.ones(n_obs) * obs_var,
+                (0, x.shape[0] - n_obs),
+            )
+        )
+        Kxx += jnp.identity(Kxx.shape[0]) * self.jitter
+        Sigma = PSD(Dense(Kxx))  # + cola.ops.I_like(Kxx) * obs_var
+        # Sigma = PSD(Sigma)
+
+        mean_t = self.prior.mean_function(t)
+        Sigma_inv_Kxt = solve(
+            Sigma, Kxt
+        )  # GPJax 0.9.3 enforces Cholesky algorithm here. I choose to let cola decide the best algorithm.
+
+        # μt  +  Ktx (Kxx + Io²)⁻¹ (y  -  μx)
+        mean = mean_t + jnp.matmul(Sigma_inv_Kxt.T, y - mx)
+
+        # Ktt  -  Ktx (Kxx + Io²)⁻¹ Kxt, TODO: Take advantage of covariance structure to compute Schur complement more efficiently.
+        covariance = Ktt - jnp.matmul(Kxt.T, Sigma_inv_Kxt)
+        covariance += I_like(covariance) * self.prior.jitter
+        covariance = PSD(covariance)
+
+        return GaussianDistribution(jnp.atleast_1d(mean.squeeze()), covariance)
+
+    def predict_delta(
+        self,
+        test_inputs,  #: Num[Array, "N D"],
+        train_data: Dataset,
+    ) -> GaussianDistribution:
+        r"""Query the predictive posterior distribution.
+
+        Conditional on a training data set, compute the GP's discrepancy process posterior
+        predictive distribution for a given set of parameters. The returned function
+        can be evaluated at a set of test inputs to compute the corresponding
+        predictive density.
+
+        The conditioning set is a GPJax `Dataset` object, whilst predictions
+        are made on a regular Jax array.
+
+        Args:
+            test_inputs (Num[Array, "N D"]): A Jax array of test inputs at which the
+                predictive distribution is evaluated.
+            train_data (Dataset): A `gpx.Dataset` object that contains the input and
+                output data used for training dataset.
+
+        Returns
+        -------
+            GaussianDistribution: A function that accepts an input array and
+                returns the predictive distribution as a `GaussianDistribution`.
+        """
+        # Unpack training data
+        x, y = train_data.X, train_data.y
+        # n_train = x.shape[0]
+        n_obs = self.prior.kernel.num_field_obs
+
+        # Unpack test inputs
+        t = test_inputs
+        # n_pred = t.shape[0]
+
+        # Observation noise o²
+        obs_var = (
+            self.likelihood.obs_stddev.value**2
+        )  # No longer used as already implemented into kernel
+        mx = self.prior.mean_function(x)
+
+        # Calculate bias terms for prediction
+        num_field_obs = self.prior.kernel.num_field_obs
+        Kddpred = self.prior.kernel.k_delta.cross_covariance(x[:num_field_obs, :], t)
+        Kdpreddpred = self.prior.kernel.k_delta.cross_covariance(t, t)
+
+        # compute the cross-covariance matrix
+        Kxx = self.prior.kernel.cross_covariance(x, x)
+
+        Kxt = jnp.pad(Kddpred, ((0, x.shape[0] - num_field_obs), (0, 0)))
+        Ktt = Kdpreddpred
+        Ktt = PSD(Dense(Ktt))
 
         # Kxx += I_like(Kxx) * self.jitter
         # Σ = Kxx + Io²
