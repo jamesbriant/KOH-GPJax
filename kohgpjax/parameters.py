@@ -5,17 +5,8 @@ import jax.numpy as jnp
 import jaxtyping
 import numpyro.distributions as npd
 import numpyro.distributions.transforms as npt
-from beartype.typing import (
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Union,
-)
-from gpjax.typing import (
-    Array,
-    ScalarFloat,
-)
+from beartype.typing import Callable, Dict, List, Optional, Union
+from gpjax.typing import Array, ScalarFloat
 
 # from typing import (
 #     Callable,

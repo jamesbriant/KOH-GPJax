@@ -9,7 +9,7 @@ __description__ = (
 )
 __url__ = "https://github.com/jamesbriant/KOH-GPJax"
 __contributors__ = "James Briant - https://james.briant.co.uk"
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __all__ = [
     "gps",
