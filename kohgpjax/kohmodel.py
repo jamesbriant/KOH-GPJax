@@ -10,10 +10,7 @@ from gpjax.typing import Array  # Added
 from jax.experimental import checkify
 
 from kohgpjax.dataset import KOHDataset
-from kohgpjax.gps import (
-    KOHPosterior,
-    construct_posterior,
-)
+from kohgpjax.gps import KOHPosterior, construct_posterior
 from kohgpjax.kernels.kohkernel import KOHKernel
 from kohgpjax.parameters import (
     ModelParameterDict,
