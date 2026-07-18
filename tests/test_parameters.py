@@ -2,6 +2,7 @@ import jax.tree_util as jtu
 import numpyro.distributions as npd
 import pytest
 from jax import (  # Removed 'config'
+    grad,
     jit,
 )
 from jax import (
@@ -372,3 +373,130 @@ def test_parameter_prior_non_identity_bijector():
     )
     actual_log_prob = prior.log_prob(unconstrained_val)
     assert jnp.isclose(actual_log_prob, expected_log_prob)
+
+
+@pytest.mark.parametrize(
+    ("bad_group", "message"),
+    [
+        (
+            None,
+            r"prior_dict\['eta'\] must be a dictionary of parameter groups",
+        ),
+        (
+            {"variances": {"variance": {"nested": ParameterPrior(npd.Normal(0, 1))}}},
+            r"prior_dict\['eta'\]\['variances'\]\['variance'\] must be a ParameterPrior instance",
+        ),
+    ],
+)
+def test_model_parameters_rejects_malformed_nested_prior_dicts(
+    bad_group, message
+):
+    prior_dict = {
+        "thetas": {"theta": ParameterPrior(npd.Normal(0, 1))},
+        "eta": bad_group,
+        "delta": {"variances": {"variance": ParameterPrior(npd.Normal(0, 1))}},
+    }
+
+    with pytest.raises(ValueError, match=message):
+        ModelParameters(prior_dict)
+
+
+def test_model_parameters_requires_variances_for_each_kernel_group():
+    prior_dict = {
+        "thetas": {"theta": ParameterPrior(npd.Normal(0, 1))},
+        "eta": {"lengthscales": {"lengthscale": ParameterPrior(npd.Normal(0, 1))}},
+        "delta": {"variances": {"variance": ParameterPrior(npd.Normal(0, 1))}},
+    }
+
+    with pytest.raises(
+        KeyError,
+        match=r"prior_dict key 'eta' must contain 'variances' key",
+    ):
+        ModelParameters(prior_dict)
+
+
+@pytest.mark.parametrize(
+    "prior_dict",
+    [
+        {
+            "thetas": {"theta": 0.0},
+            "eta": {"variances": {"variance": ParameterPrior(npd.Normal(0, 1))}},
+            "delta": {"variances": {"variance": ParameterPrior(npd.Normal(0, 1))}},
+        },
+        {
+            "thetas": {"theta": ParameterPrior(npd.Normal(0, 1))},
+            "eta": {"variances": {"variance": 1.0}},
+            "delta": {"variances": {"variance": ParameterPrior(npd.Normal(0, 1))}},
+        },
+    ],
+)
+def test_model_parameters_rejects_non_parameter_prior_leaves(prior_dict):
+    with pytest.raises(ValueError, match="must be a ParameterPrior instance"):
+        ModelParameters(prior_dict)
+
+
+@pytest.mark.parametrize("method_name", ["constrain_sample", "unflatten_sample"])
+@pytest.mark.parametrize("sample_length", [7, 9])
+def test_model_parameters_rejects_wrong_length_flat_samples(
+    model_params: ModelParameters, method_name: str, sample_length: int
+):
+    samples = jnp.zeros(sample_length)
+
+    with pytest.raises(
+        ValueError,
+        match=rf"Flat samples must contain exactly {model_params.n_params} values",
+    ):
+        getattr(model_params, method_name)(samples)
+
+
+def test_parameter_prior_forward_inverse_round_trip_for_constrained_priors():
+    priors = [
+        ParameterPrior(npd.Exponential(rate=1.0)),
+        ParameterPrior(npd.LogNormal(0.0, 1.0)),
+        ParameterPrior(npd.HalfNormal(1.0)),
+    ]
+    unconstrained_values = jnp.array([-1.0, 0.0, 1.25])
+
+    for prior, unconstrained_value in zip(priors, unconstrained_values, strict=True):
+        constrained_value = prior.forward(unconstrained_value)
+        recovered_value = prior.inverse(constrained_value)
+        assert jnp.isfinite(constrained_value)
+        assert jnp.allclose(recovered_value, unconstrained_value)
+
+
+def test_model_parameters_transformed_log_prior_has_finite_correct_gradient():
+    params = ModelParameters(
+        {
+            "thetas": {"theta": ParameterPrior(npd.Normal(0.0, 1.0))},
+            "eta": {
+                "variances": {
+                    "variance": ParameterPrior(npd.Exponential(rate=1.0))
+                }
+            },
+            "delta": {
+                "variances": {"variance": ParameterPrior(npd.LogNormal(0.0, 1.0))}
+            },
+            "epsilon": {
+                "variances": {"noise": ParameterPrior(npd.HalfNormal(1.0))}
+            },
+        }
+    )
+    log_prior = params.get_log_prior_func()
+    unconstrained = jnp.array([0.2, -0.3, 0.4, 0.1])
+
+    # The public function accepts a flat list of scalar leaves. Wrap the
+    # vector input so JAX can differentiate with respect to one flat array.
+    gradient = grad(
+        lambda values: log_prior([values[i] for i in range(params.n_params)])
+    )(unconstrained)
+    expected_gradient = jnp.array(
+        [
+            -0.2,  # delta: LogNormal(0, 1), transformed log density
+            1.0 - jnp.exp(2.0 * -0.3),  # epsilon: HalfNormal(1)
+            1.0 - jnp.exp(0.4),  # eta: Exponential(1)
+            -0.1,  # theta: Normal(0, 1)
+        ]
+    )
+
+    assert jnp.all(jnp.isfinite(gradient))
+    assert jnp.allclose(gradient, expected_gradient, atol=1e-5)
