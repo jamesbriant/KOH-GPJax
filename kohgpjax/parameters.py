@@ -147,6 +147,7 @@ class ModelParameters:
         Returns:
             A list of samples transformed to the constrained space.
         """
+        _check_sample_length(samples_flat, self.n_params)
         return [
             prior.forward(samples_flat[i]) for i, prior in enumerate(self.priors_flat)
         ]
@@ -162,6 +163,7 @@ class ModelParameters:
         Returns:
             A tree of samples with the same structure as the priors.
         """
+        _check_sample_length(samples_flat, self.n_params)
         # Unflatten the samples to the original tree structure
         return jax.tree.unflatten(self.priors_tree, samples_flat)
 
@@ -240,6 +242,11 @@ def _check_prior_dict(prior_dict: ModelParameterPriorDict) -> None:
                     )
 
         else:
+            if not isinstance(param_prior_dict, dict):
+                raise ValueError(
+                    f"prior_dict['{key}'] must be a dictionary of parameter groups."
+                )
+
             if "variances" not in param_prior_dict:
                 raise KeyError(
                     f"prior_dict key '{key}' must contain 'variances' key with dictionary of ParameterPrior instances."
@@ -261,3 +268,20 @@ def _check_prior_dict(prior_dict: ModelParameterPriorDict) -> None:
         # e.g. if kernel_item['kernel'] is RBF, check that lengthscale is a npd.Distribution
         # How to get the parameters from the kernel class?
         # Is this worth the faff?
+
+
+def _check_sample_length(samples_flat, expected_length: int) -> None:
+    """Check that a flat sample contains exactly one value per prior."""
+    try:
+        actual_length = len(samples_flat)
+    except TypeError as error:
+        raise ValueError(
+            "Flat samples must be a one-dimensional sequence with "
+            f"{expected_length} values."
+        ) from error
+
+    if actual_length != expected_length:
+        raise ValueError(
+            f"Flat samples must contain exactly {expected_length} values. "
+            f"Got {actual_length}."
+        )
