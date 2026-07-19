@@ -3,6 +3,7 @@ import numpyro.distributions as npd
 import pytest
 from gpjax.dataset import Dataset  # Corrected import
 from gpjax.parameters import Static  # Explicit import for Static
+from jax import config
 from jax import (  # Removed 'config'
     jit,
 )
@@ -19,6 +20,8 @@ from kohgpjax.parameters import (
     ModelParameters,
     ParameterPrior,
 )
+
+config.update("jax_enable_x64", True)
 
 # --- Minimal Concrete KOHModel Subclass ---
 
@@ -46,6 +49,16 @@ class MinimalKOHModel(KOHModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._kohdataset_cached_for_test = kwargs.get("kohdataset")
+
+
+class MissingEtaKOHModel(KOHModel):
+    def k_delta(self, params_constrained: dict) -> gpx.kernels.AbstractKernel:
+        return gpx.kernels.RBF()
+
+
+class MissingDeltaKOHModel(KOHModel):
+    def k_eta(self, params_constrained: dict) -> gpx.kernels.AbstractKernel:
+        return gpx.kernels.RBF()
 
 
 # --- Fixtures ---
@@ -202,6 +215,80 @@ def test_k_epsilon(
     assert k_eps_static.active_dims == list(
         range(koh_dataset_fixture.num_variable_params)
     )
+
+
+@pytest.mark.parametrize("invalid_obs_stddev", [0.1, jnp.array([0.1]), object()])
+def test_kohmodel_rejects_invalid_obs_stddev_types(
+    model_parameters_fixture: ModelParameters,
+    koh_dataset_fixture: KOHDataset,
+    invalid_obs_stddev,
+):
+    with pytest.raises(
+        ValueError,
+        match=r"`obs_stddev` must be a `gpx\.parameters\.Static` object or `None`\.",
+    ):
+        MinimalKOHModel(
+            model_parameters=model_parameters_fixture,
+            kohdataset=koh_dataset_fixture,
+            obs_stddev=invalid_obs_stddev,
+        )
+
+
+def test_k_epsilon_requires_dynamic_variance(
+    minimal_koh_model_fixture: MinimalKOHModel,
+):
+    with pytest.raises(
+        ValueError,
+        match=r"k_epsilon: variance is None from both self\.obs_var and params_constrained\.",
+    ):
+        minimal_koh_model_fixture.k_epsilon({})
+
+
+def test_static_and_learned_observation_noise_have_distinct_numeric_covariances(
+    minimal_koh_model_fixture: MinimalKOHModel,
+    minimal_koh_model_static_obs_fixture: MinimalKOHModel,
+    gpjax_params_fixture: ModelParameterDict,
+    koh_dataset_fixture: KOHDataset,
+):
+    learned_params = {
+        **gpjax_params_fixture,
+        "epsilon": {
+            **gpjax_params_fixture["epsilon"],
+            "variances": {"obs_noise": jnp.array(0.25)},
+        },
+    }
+    learned_kernel = minimal_koh_model_fixture.k_epsilon(learned_params)
+    static_kernel = minimal_koh_model_static_obs_fixture.k_epsilon(
+        gpjax_params_fixture
+    )
+
+    learned_covariance = learned_kernel.cross_covariance(
+        koh_dataset_fixture.Xf, koh_dataset_fixture.Xf
+    )
+    static_covariance = static_kernel.cross_covariance(
+        koh_dataset_fixture.Xf, koh_dataset_fixture.Xf
+    )
+
+    assert jnp.allclose(learned_covariance, jnp.eye(koh_dataset_fixture.num_field_obs) * 0.25)
+    assert jnp.allclose(static_covariance, jnp.eye(koh_dataset_fixture.num_field_obs) * 0.01)
+    assert not jnp.allclose(learned_covariance, static_covariance)
+
+
+@pytest.mark.parametrize(
+    ("model_class", "missing_method"),
+    [
+        (MissingEtaKOHModel, "k_eta"),
+        (MissingDeltaKOHModel, "k_delta"),
+    ],
+)
+def test_kohmodel_subclasses_must_implement_both_component_kernels(
+    model_class, missing_method
+):
+    with pytest.raises(
+        TypeError,
+        match=rf"Can't instantiate abstract class {model_class.__name__} without an implementation for abstract method '{missing_method}'",
+    ):
+        model_class(None, None)
 
 
 def test_gp_kernel(
