@@ -194,10 +194,15 @@ class KOHModel(nnx.Module):
         # Gaussian() wraps scalar noise in GPJax's trainable NonNegativeReal.
         # KOH-GPJax puts observation noise in k_epsilon(), so the likelihood's
         # zero-noise placeholder must not be exposed to GPJax optimisers.
-        return gpx.likelihoods.Gaussian(
+        likelihood = gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
-            obs_stddev=nnx.Variable(jnp.asarray(0.0)),  # See self.k_epsilon()
+            obs_stddev=0.0,  # See self.k_epsilon()
         )
+        # Gaussian.__init__ wraps scalar values as NonNegativeReal parameters,
+        # so replace the zero-noise placeholder after construction with a
+        # non-trainable NNX variable.
+        likelihood.obs_stddev = nnx.Variable(jnp.asarray(0.0))
+        return likelihood
 
     def GP_posterior(
         self,
