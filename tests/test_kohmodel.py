@@ -325,11 +325,16 @@ def test_fixed_observation_noise_is_jittable(
 def test_kohmodel_subclasses_must_implement_both_component_kernels(
     model_class, missing_method
 ):
-    with pytest.raises(
-        TypeError,
-        match=rf"Can't instantiate abstract class {model_class.__name__} without an implementation for abstract method '{missing_method}'",
-    ):
+    with pytest.raises(TypeError) as exc_info:
         model_class(None, None)
+
+    # CPython formats this message differently across supported Python
+    # versions (for example, "with abstract method" versus "without an
+    # implementation for abstract method"). Check the stable information
+    # instead of depending on the exact wording.
+    message = str(exc_info.value)
+    assert model_class.__name__ in message
+    assert missing_method in message
 
 
 def test_gp_kernel(
