@@ -186,17 +186,17 @@ def test_kohkernelcomputation_cross_covariance_values(setup_computation_test):
     actual_gram_matrix_jit = to_dense_if_needed(actual_gram_matrix_jit_op)
     assert jnp.allclose(actual_gram_matrix_jit, expected_gram_matrix, atol=1e-6)
 
-    # Test the N != M case for cross_covariance, expecting a broadcasting error
-    # due to the current padding logic in the source code.
+    # Rectangular cross-covariance must be supported. The eta component is
+    # rectangular, while the structured correction is padded independently in
+    # the row and column dimensions.
     X_generic1 = s["X1"]
-    # Re-create an X_generic2 that has M != N for this specific check, as fixture X2 might now have M=N
     n_field_obs_s, _, dim_k_eta_inputs_s = (
         s["n_field_obs"],
         kernel.num_sim_obs,
         X_generic1.shape[1],
     )
     N_current = X_generic1.shape[0]
-    M_for_error_check = N_current + 1  # Ensure M != N
+    M_for_rectangular_check = N_current + 1
 
     X2_field_err = (
         jnp.arange(n_field_obs_s * dim_k_eta_inputs_s).reshape(
@@ -205,18 +205,43 @@ def test_kohkernelcomputation_cross_covariance_values(setup_computation_test):
         * 0.7
     ) + 0.01
     X2_sim_err = (
-        jnp.arange((M_for_error_check - n_field_obs_s) * dim_k_eta_inputs_s).reshape(
-            (M_for_error_check - n_field_obs_s), dim_k_eta_inputs_s
-        )
+        jnp.arange(
+            (M_for_rectangular_check - n_field_obs_s) * dim_k_eta_inputs_s
+        ).reshape((M_for_rectangular_check - n_field_obs_s), dim_k_eta_inputs_s)
         * 0.8
     ) + 0.01
-    X_generic2_for_error_check = jnp.vstack((X2_field_err, X2_sim_err))
+    X_generic2_rectangular = jnp.vstack((X2_field_err, X2_sim_err))
 
-    if X_generic1.shape[0] != X_generic2_for_error_check.shape[0]:
-        with pytest.raises(TypeError, match="incompatible shapes for broadcasting"):
-            # This call is expected to fail due to the padding issue when N != M
-            # and the subsequent addition sigma_eta + padded_block_diag
-            engine.cross_covariance(kernel, X_generic1, X_generic2_for_error_check)
+    rectangular = engine.cross_covariance(kernel, X_generic1, X_generic2_rectangular)
+    assert rectangular.shape == (
+        X_generic1.shape[0],
+        X_generic2_rectangular.shape[0],
+    )
 
-
-# End of test_kohcomputation.py
+    sigma_eta_rectangular = kernel.k_eta.cross_covariance(
+        X_generic1, X_generic2_rectangular
+    )
+    sigma_delta_rectangular = kernel.k_delta.cross_covariance(
+        X_generic1[:n_field_obs_s], X_generic2_rectangular[:n_field_obs_s]
+    )
+    sigma_epsilon_rectangular = kernel.k_epsilon.cross_covariance(
+        X_generic1[:n_field_obs_s], X_generic2_rectangular[:n_field_obs_s]
+    )
+    sigma_epsilon_eta_rectangular = kernel.k_epsilon_eta.cross_covariance(
+        X_generic1[n_field_obs_s : n_field_obs_s + kernel.num_sim_obs],
+        X_generic2_rectangular[n_field_obs_s : n_field_obs_s + kernel.num_sim_obs],
+    )
+    expected_rectangular = sigma_eta_rectangular + jnp.pad(
+        block_diag(
+            sigma_delta_rectangular + sigma_epsilon_rectangular,
+            sigma_epsilon_eta_rectangular,
+        ),
+        (
+            (0, X_generic1.shape[0] - n_field_obs_s - kernel.num_sim_obs),
+            (
+                0,
+                X_generic2_rectangular.shape[0] - n_field_obs_s - kernel.num_sim_obs,
+            ),
+        ),
+    )
+    assert jnp.allclose(rectangular, expected_rectangular, atol=1e-6)

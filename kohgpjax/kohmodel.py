@@ -29,7 +29,7 @@ class KOHModel(nnx.Module):
         self,
         model_parameters: MP,
         kohdataset: KOHDataset,
-        obs_stddev: gpx.parameters.Static = None,
+        obs_stddev=None,
         jitter: float = 1e-6,
     ):
         """
@@ -39,25 +39,32 @@ class KOHModel(nnx.Module):
             The model parameters for the KOH model.
         kohdataset: KOHDataset
             The dataset containing the field and simulation observations.
-        obs_stddev: gpx.parameters.Static
-            The standard deviation of the observations. If not None, it will be static and not estimated.
+        obs_stddev: scalar or one-element array, optional
+            The standard deviation of the observations. If supplied, it is fixed
+            for this KOH model rather than read from ``params_constrained``.
         jitter: float
             The jitter to add to the covariance matrix for numerical stability.
         """
         if obs_stddev is not None:
-            if not isinstance(obs_stddev, gpx.parameters.Static):
+            try:
+                obs_stddev = jnp.asarray(obs_stddev)
+            except (TypeError, ValueError) as exc:
                 raise ValueError(
-                    "`obs_stddev` must be a `gpx.parameters.Static` object or `None`."
+                    "`obs_stddev` must be a non-negative scalar or one-element array."
+                ) from exc
+
+            if obs_stddev.ndim > 1 or obs_stddev.size != 1:
+                raise ValueError(
+                    "`obs_stddev` must be a non-negative scalar or one-element array."
                 )
-            # if obs_stddev.shape != (1,): #TODO: This should be changed to allow a vector of variances
-            #     raise ValueError("`obs_stddev` must have shape `(1,)`. For more complex models, implement your own `k_epsilon()` method.")
+            if not bool(jnp.all(obs_stddev >= 0)):
+                raise ValueError("`obs_stddev` must be non-negative.")
+
             self.obs_stddev = obs_stddev
 
         self.model_parameters = model_parameters
         self.kohdataset = kohdataset
-        self.obs_var = (
-            gpx.parameters.Static(obs_stddev**2) if obs_stddev is not None else None
-        )
+        self.obs_var = obs_stddev**2 if obs_stddev is not None else None
         self.jitter = jitter  # GPJax default is 1e-6
 
     ############## GPJAX MODEL ##############
@@ -129,13 +136,39 @@ class KOHModel(nnx.Module):
                     "k_epsilon: variance is None from both self.obs_var and params_constrained."
                 )
 
+        # GPJax wraps raw White-kernel variances in a trainable Parameter. Use a
+        # plain NNX Variable for explicitly fixed observation noise so it remains
+        # part of the kernel state without being selected by GPJax optimisers.
+        if self.obs_var is not None:
+            variance_to_use = nnx.Variable(variance_to_use)
+
         return gpx.kernels.White(
             active_dims=list(range(self.kohdataset.num_variable_params)),
             variance=variance_to_use,
         )
 
     def k_epsilon_eta(self, params_constrained) -> gpx.kernels.AbstractKernel:
-        return gpx.kernels.White(variance=0.0)
+        # This component is structurally zero by default. If the user supplies
+        # an epsilon_eta variance in the constrained parameter tree, pass the
+        # raw value to GPJax so it becomes an optimisable Parameter instead.
+        variance = (
+            params_constrained.get("epsilon_eta", {})
+            .get("variances", {})
+            .get("obs_noise")
+        )
+        if variance is None:
+            variance = (
+                params_constrained.get("epsilon_eta", {})
+                .get("variances", {})
+                .get("var")
+            )
+
+        if variance is None:
+            # A plain NNX Variable is retained by the kernel but excluded from
+            # GPJax's default Parameter trainable filter.
+            variance = nnx.Variable(jnp.asarray(0.0))
+
+        return gpx.kernels.White(variance=variance)
 
     def GP_kernel(self, GPJAX_params: ModelParameterDict) -> gpx.kernels.AbstractKernel:
         return KOHKernel(
@@ -158,10 +191,18 @@ class KOHModel(nnx.Module):
         Returns:
             A GPJAX likelihood object.
         """
-        return gpx.likelihoods.Gaussian(
+        # Gaussian() wraps scalar noise in GPJax's trainable NonNegativeReal.
+        # KOH-GPJax puts observation noise in k_epsilon(), so the likelihood's
+        # zero-noise placeholder must not be exposed to GPJax optimisers.
+        likelihood = gpx.likelihoods.Gaussian(
             num_datapoints=num_datapoints,
             obs_stddev=0.0,  # See self.k_epsilon()
         )
+        # Gaussian.__init__ wraps scalar values as NonNegativeReal parameters,
+        # so replace the zero-noise placeholder after construction with a
+        # non-trainable NNX variable.
+        likelihood.obs_stddev = nnx.Variable(jnp.asarray(0.0))
+        return likelihood
 
     def GP_posterior(
         self,

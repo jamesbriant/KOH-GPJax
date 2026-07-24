@@ -2,7 +2,6 @@ import gpjax as gpx
 import pytest
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
-from gpjax.parameters import Static
 from jax import jit  # Removed 'config'
 from jax import numpy as jnp
 from jax import tree_util as jtu
@@ -46,9 +45,7 @@ def mock_standard_prior_fixture() -> gpx.gps.Prior:  # For testing non-KOH path
 @pytest.fixture(scope="module")
 def mock_likelihood_fixture() -> gpx.likelihoods.Gaussian:
     # num_datapoints should match dataset used for predictions
-    return gpx.likelihoods.Gaussian(
-        num_datapoints=Static(jnp.array(4))
-    )  # Example: 2 field + 2 sim
+    return gpx.likelihoods.Gaussian(num_datapoints=4)  # Example: 2 field + 2 sim
 
 
 @pytest.fixture(scope="module")
@@ -177,6 +174,17 @@ def test_koh_posterior_predict_zeta_type(
         test_input_points_fixture.shape[0],
     )
 
+    # Adding observation noise must add precisely the epsilon kernel's
+    # covariance to the latent zeta predictive covariance.
+    expected_noise = mock_prior_fixture.kernel.k_epsilon.cross_covariance(
+        test_input_points_fixture, test_input_points_fixture
+    )
+    assert jnp.allclose(
+        prediction_true.covariance() - prediction_false.covariance(),
+        expected_noise,
+        atol=1e-5,
+    )
+
     # Check JIT compilability
     # JIT with static include_observation_noise works for both False and True
     jitted_predict_zeta_static = jit(
@@ -213,6 +221,63 @@ def test_koh_posterior_predict_obs_type(
     assert prediction.covariance().shape == (
         test_input_points_fixture.shape[0],
         test_input_points_fixture.shape[0],
+    )
+
+
+def test_koh_posterior_predict_delta_has_delta_only_prior_covariance(
+    mock_prior_fixture: gpx.gps.Prior,
+    mock_likelihood_fixture: gpx.likelihoods.Gaussian,
+    test_input_points_fixture: jnp.ndarray,
+    mock_dataset_fixture: Dataset,
+):
+    posterior = construct_posterior(mock_prior_fixture, mock_likelihood_fixture)
+    prediction = posterior.predict_delta(
+        test_input_points_fixture, train_data=mock_dataset_fixture
+    )
+
+    assert isinstance(prediction, GaussianDistribution)
+    assert prediction.mean.shape == (test_input_points_fixture.shape[0],)
+    assert prediction.covariance().shape == (
+        test_input_points_fixture.shape[0],
+        test_input_points_fixture.shape[0],
+    )
+    assert jnp.allclose(
+        prediction.covariance(), prediction.covariance().T, atol=1e-6
+    )
+    assert jnp.all(jnp.linalg.eigvalsh(prediction.covariance()) >= -1e-5)
+
+    # Independently reproduce the Gaussian conditioning calculation. The
+    # cross-covariance for delta is non-zero only for field observations.
+    x, y = mock_dataset_fixture.X, mock_dataset_fixture.y
+    num_field_obs = mock_prior_fixture.kernel.num_field_obs
+    kxx = mock_prior_fixture.kernel.cross_covariance(x, x)
+    kxt = jnp.pad(
+        mock_prior_fixture.kernel.k_delta.cross_covariance(
+            x[:num_field_obs], test_input_points_fixture
+        ),
+        ((0, x.shape[0] - num_field_obs), (0, 0)),
+    )
+    ktt = mock_prior_fixture.kernel.k_delta.cross_covariance(
+        test_input_points_fixture, test_input_points_fixture
+    )
+    obs_var = mock_likelihood_fixture.obs_stddev.value**2
+    kxx = kxx + jnp.diag(
+        jnp.pad(
+            jnp.ones(num_field_obs) * obs_var,
+            (0, x.shape[0] - num_field_obs),
+        )
+    )
+    kxx = kxx + jnp.eye(x.shape[0]) * posterior.prior.jitter
+    solved_kxt = jnp.linalg.solve(kxx, kxt)
+    expected_mean = solved_kxt.T @ y
+    expected_covariance = ktt - kxt.T @ solved_kxt
+    expected_covariance = expected_covariance + jnp.eye(
+        test_input_points_fixture.shape[0]
+    ) * posterior.prior.jitter
+
+    assert jnp.allclose(prediction.mean, expected_mean.squeeze(), atol=1e-5)
+    assert jnp.allclose(
+        prediction.covariance(), expected_covariance, atol=1e-5
     )
 
 

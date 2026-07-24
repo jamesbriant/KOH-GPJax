@@ -62,6 +62,7 @@ class KOHKernelComputation(AbstractKernelComputation):
         a = kernel.num_field_obs
         b = kernel.num_sim_obs
         N = x.shape[0]
+        M = y.shape[0]
 
         # PART 1 & 2
         sigma_eta, sigma_delta, sigma_epsilon, sigma_epsilon_eta = (
@@ -71,5 +72,5 @@ class KOHKernelComputation(AbstractKernelComputation):
         # PART 3 - Construct the output array
         return sigma_eta + pad(
             block_diag(sigma_delta + sigma_epsilon, sigma_epsilon_eta),
-            ((0, N - a - b), (0, N - a - b)),
+            ((0, N - a - b), (0, M - a - b)),
         )

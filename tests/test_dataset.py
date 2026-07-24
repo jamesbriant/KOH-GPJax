@@ -1,23 +1,29 @@
 import pytest
 from gpjax.dataset import Dataset
-from jax import numpy as jnp  # Removed 'config'
+from jax import config
+from jax import numpy as jnp
+from jax import tree_util as jtu
 from kohgpjax.dataset import KOHDataset
+
+config.update("jax_enable_x64", True)
 
 # --- Fixtures ---
 
 
 @pytest.fixture(scope="module")
 def field_data_input():
-    x_field = jnp.array([[1.0, 2.0], [3.0, 4.0]])
-    y_field = jnp.array([[1.0], [2.0]])
+    x_field = jnp.array([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float64)
+    y_field = jnp.array([[1.0], [2.0]], dtype=jnp.float64)
     return Dataset(x_field, y_field)
 
 
 @pytest.fixture(scope="module")
 def sim_data_input():
     # x_sim has 2 variable params and 2 calibration params
-    x_sim = jnp.array([[1.0, 2.0, 3.0, 2.0], [4.0, 5.0, 6.0, 3.0]])
-    y_sim = jnp.array([[1.0], [2.0]])
+    x_sim = jnp.array(
+        [[1.0, 2.0, 3.0, 2.0], [4.0, 5.0, 6.0, 3.0]], dtype=jnp.float64
+    )
+    y_sim = jnp.array([[1.0], [2.0]], dtype=jnp.float64)
     return Dataset(x_sim, y_sim)
 
 
@@ -292,3 +298,117 @@ def test_koh_dataset_tree_flatten_unflatten(
         new_instance.num_calib_params == koh_dataset_instance.num_calib_params
     )  # Check one derived attribute
     assert jnp.array_equal(new_instance.d, koh_dataset_instance.d)  # Check a property
+
+
+@pytest.mark.parametrize(("x_rows", "y_rows"), [(2, 1), (1, 2)])
+def test_koh_dataset_rejects_mismatched_input_and_output_rows(x_rows, y_rows):
+    """GPJax rejects each dataset before it can form a KOHDataset."""
+    X = jnp.ones((x_rows, 1), dtype=jnp.float64)
+    y = jnp.ones((y_rows, 1), dtype=jnp.float64)
+
+    with pytest.raises(
+        ValueError,
+        match=r"Inputs, X, and outputs, y, must have the same number of rows",
+    ):
+        Dataset(X, y)
+
+
+def test_koh_dataset_rejects_zero_calibration_parameters():
+    field_dataset = Dataset(
+        jnp.ones((2, 1), dtype=jnp.float64),
+        jnp.ones((2, 1), dtype=jnp.float64),
+    )
+    simulation_dataset = Dataset(
+        jnp.ones((3, 1), dtype=jnp.float64),
+        jnp.ones((3, 1), dtype=jnp.float64),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"Input dimension of simulation data \(1\) must be greater than input dimension of field data \(1\)",
+    ):
+        KOHDataset(field_dataset, simulation_dataset)
+
+
+def test_koh_dataset_supports_one_calibration_parameter():
+    field_dataset = Dataset(
+        jnp.array([[1.0], [2.0]], dtype=jnp.float64),
+        jnp.array([[10.0], [20.0]], dtype=jnp.float64),
+    )
+    simulation_dataset = Dataset(
+        jnp.array([[1.0, 0.1], [2.0, 0.2], [3.0, 0.3]], dtype=jnp.float64),
+        jnp.array([[11.0], [22.0], [33.0]], dtype=jnp.float64),
+    )
+    koh_dataset = KOHDataset(field_dataset, simulation_dataset)
+
+    assert koh_dataset.num_calib_params == 1
+    theta = jnp.array([[0.75]], dtype=jnp.float64)
+    assert jnp.array_equal(
+        koh_dataset.X(theta),
+        jnp.array(
+            [[1.0, 0.75], [2.0, 0.75], [1.0, 0.1], [2.0, 0.2], [3.0, 0.3]],
+            dtype=jnp.float64,
+        ),
+    )
+
+
+@pytest.mark.parametrize(("num_field_obs", "num_sim_obs"), [(1, 1), (3, 2), (2, 5)])
+def test_koh_dataset_supports_multiple_field_and_simulation_counts(
+    num_field_obs, num_sim_obs
+):
+    field_dataset = Dataset(
+        jnp.arange(num_field_obs, dtype=jnp.float64).reshape(-1, 1),
+        jnp.arange(num_field_obs, dtype=jnp.float64).reshape(-1, 1),
+    )
+    simulation_dataset = Dataset(
+        jnp.arange(num_sim_obs * 2, dtype=jnp.float64).reshape(num_sim_obs, 2),
+        jnp.arange(num_sim_obs, dtype=jnp.float64).reshape(-1, 1),
+    )
+    koh_dataset = KOHDataset(field_dataset, simulation_dataset)
+    theta = jnp.array([[5.0]], dtype=jnp.float64)
+
+    assert koh_dataset.num_field_obs == num_field_obs
+    assert koh_dataset.num_sim_obs == num_sim_obs
+    assert koh_dataset.n == num_field_obs + num_sim_obs
+    assert koh_dataset.X(theta).shape == (num_field_obs + num_sim_obs, 2)
+    assert koh_dataset.d.shape == (num_field_obs + num_sim_obs, 1)
+    assert jnp.all(koh_dataset.Xf_theta(theta)[:, 1] == 5.0)
+
+
+def test_koh_dataset_preserves_float64_dtype_through_functional_operations():
+    dtype = jnp.float64
+    field_dataset = Dataset(
+        jnp.array([[1.0], [2.0]], dtype=dtype),
+        jnp.array([[10.0], [20.0]], dtype=dtype),
+    )
+    simulation_dataset = Dataset(
+        jnp.array([[1.0, 0.1], [2.0, 0.2]], dtype=dtype),
+        jnp.array([[11.0], [22.0]], dtype=dtype),
+    )
+    koh_dataset = KOHDataset(field_dataset, simulation_dataset)
+    theta = jnp.array([[0.5]], dtype=dtype)
+
+    assert koh_dataset.Xf.dtype == dtype
+    assert koh_dataset.Xc.dtype == dtype
+    assert koh_dataset.z.dtype == dtype
+    assert koh_dataset.y.dtype == dtype
+    assert koh_dataset.d.dtype == dtype
+    assert koh_dataset.Xf_theta(theta).dtype == dtype
+    assert koh_dataset.X(theta).dtype == dtype
+    assert koh_dataset.get_dataset(theta).X.dtype == dtype
+    assert koh_dataset.get_dataset(theta).y.dtype == dtype
+
+
+def test_koh_dataset_pytree_round_trip_remains_functionally_usable(
+    koh_dataset_instance,
+):
+    leaves, treedef = jtu.tree_flatten(koh_dataset_instance)
+    reconstructed = jtu.tree_unflatten(treedef, leaves)
+    theta = jnp.array([[1.5, 2.5]])
+
+    assert jnp.array_equal(reconstructed.X(theta), koh_dataset_instance.X(theta))
+    assert jnp.array_equal(reconstructed.d, koh_dataset_instance.d)
+    reconstructed_dataset = reconstructed.get_dataset(theta)
+    original_dataset = koh_dataset_instance.get_dataset(theta)
+    assert jnp.array_equal(reconstructed_dataset.X, original_dataset.X)
+    assert jnp.array_equal(reconstructed_dataset.y, original_dataset.y)
