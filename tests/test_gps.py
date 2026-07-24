@@ -2,7 +2,6 @@ import gpjax as gpx
 import pytest
 from gpjax.dataset import Dataset
 from gpjax.distributions import GaussianDistribution
-from gpjax.parameters import Static
 from jax import jit  # Removed 'config'
 from jax import numpy as jnp
 from jax import tree_util as jtu
@@ -46,9 +45,7 @@ def mock_standard_prior_fixture() -> gpx.gps.Prior:  # For testing non-KOH path
 @pytest.fixture(scope="module")
 def mock_likelihood_fixture() -> gpx.likelihoods.Gaussian:
     # num_datapoints should match dataset used for predictions
-    return gpx.likelihoods.Gaussian(
-        num_datapoints=Static(jnp.array(4))
-    )  # Example: 2 field + 2 sim
+    return gpx.likelihoods.Gaussian(num_datapoints=4)  # Example: 2 field + 2 sim
 
 
 @pytest.fixture(scope="module")

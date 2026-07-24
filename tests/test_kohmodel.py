@@ -1,8 +1,9 @@
 import gpjax as gpx  # Using gpx alias for gpjax
 import numpyro.distributions as npd
 import pytest
+from flax import nnx
 from gpjax.dataset import Dataset  # Corrected import
-from gpjax.parameters import Static  # Explicit import for Static
+from gpjax.parameters import Parameter
 from jax import config
 from jax import (  # Removed 'config'
     jit,
@@ -156,7 +157,7 @@ def minimal_koh_model_static_obs_fixture(
     return MinimalKOHModel(
         model_parameters=model_parameters_fixture,
         kohdataset=koh_dataset_fixture,
-        obs_stddev=Static(jnp.array([0.1])),  # static obs_stddev
+        obs_stddev=jnp.array([0.1]),  # fixed obs_stddev
         jitter=1e-6,
     )
 
@@ -178,10 +179,9 @@ def test_kohmodel_initialization(
     model_static = MinimalKOHModel(
         model_parameters_fixture,
         koh_dataset_fixture,
-        obs_stddev=Static(jnp.array([0.5])),
+        obs_stddev=jnp.array([0.5]),
     )
-    assert isinstance(model_static.obs_var, Static)
-    assert jnp.isclose(model_static.obs_var.value, 0.5**2)
+    assert jnp.isclose(model_static.obs_var, 0.5**2)
 
 
 def test_gp_prior_mean_function(minimal_koh_model_fixture: MinimalKOHModel):
@@ -203,6 +203,7 @@ def test_k_epsilon(
     # which is npd.HalfNormal(1.0).log_prob(0.0) -> constrained value is exp(0) = 1.0
     expected_dyn_var = gpjax_params_fixture["epsilon"]["variances"]["obs_noise"]
     assert jnp.isclose(k_eps_dynamic.variance.value, expected_dyn_var)
+    assert isinstance(k_eps_dynamic.variance, gpx.parameters.Parameter)
     assert k_eps_dynamic.active_dims == list(
         range(koh_dataset_fixture.num_variable_params)
     )
@@ -210,22 +211,24 @@ def test_k_epsilon(
     # Case 2: obs_stddev was static
     k_eps_static = minimal_koh_model_static_obs_fixture.k_epsilon(gpjax_params_fixture)
     assert isinstance(k_eps_static, gpx.kernels.White)
-    assert isinstance(k_eps_static.variance, Static)
+    assert not isinstance(k_eps_static.variance, gpx.parameters.Parameter)
     assert jnp.isclose(k_eps_static.variance.value, 0.1**2)
     assert k_eps_static.active_dims == list(
         range(koh_dataset_fixture.num_variable_params)
     )
 
 
-@pytest.mark.parametrize("invalid_obs_stddev", [0.1, jnp.array([0.1]), object()])
-def test_kohmodel_rejects_invalid_obs_stddev_types(
+@pytest.mark.parametrize(
+    "invalid_obs_stddev", [-0.1, jnp.array([-0.1]), jnp.array([0.1, 0.2]), object()]
+)
+def test_kohmodel_rejects_invalid_obs_stddev_values(
     model_parameters_fixture: ModelParameters,
     koh_dataset_fixture: KOHDataset,
     invalid_obs_stddev,
 ):
     with pytest.raises(
         ValueError,
-        match=r"`obs_stddev` must be a `gpx\.parameters\.Static` object or `None`\.",
+        match=r"`obs_stddev` must be",
     ):
         MinimalKOHModel(
             model_parameters=model_parameters_fixture,
