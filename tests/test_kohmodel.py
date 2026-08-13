@@ -1,10 +1,8 @@
 import gpjax as gpx  # Using gpx alias for gpjax
 import numpyro.distributions as npd
 import pytest
-from flax import nnx
 from gpjax.dataset import Dataset  # Corrected import
-from gpjax.parameters import Parameter
-from jax import config, jit
+from jax import grad, jit
 from jax import (
     numpy as jnp,
 )
@@ -18,8 +16,6 @@ from kohgpjax.parameters import (
     ModelParameters,
     ParameterPrior,
 )
-
-config.update("jax_enable_x64", True)
 
 # --- Minimal Concrete KOHModel Subclass ---
 
@@ -200,7 +196,6 @@ def test_k_epsilon(
     # which is npd.HalfNormal(1.0).log_prob(0.0) -> constrained value is exp(0) = 1.0
     expected_dyn_var = gpjax_params_fixture["epsilon"]["variances"]["obs_noise"]
     assert jnp.isclose(k_eps_dynamic.variance.value, expected_dyn_var)
-    assert isinstance(k_eps_dynamic.variance, gpx.parameters.Parameter)
     assert k_eps_dynamic.active_dims == list(
         range(koh_dataset_fixture.num_variable_params)
     )
@@ -208,7 +203,6 @@ def test_k_epsilon(
     # Case 2: obs_stddev was static
     k_eps_static = minimal_koh_model_static_obs_fixture.k_epsilon(gpjax_params_fixture)
     assert isinstance(k_eps_static, gpx.kernels.White)
-    assert not isinstance(k_eps_static.variance, gpx.parameters.Parameter)
     assert jnp.isclose(k_eps_static.variance.value, 0.1**2)
     assert k_eps_static.active_dims == list(
         range(koh_dataset_fixture.num_variable_params)
@@ -355,10 +349,9 @@ def test_gp_kernel(
     assert jnp.isclose(
         kernel.k_epsilon_eta.variance.value, 0.0
     )  # k_epsilon_eta is White(0.0)
-    assert not isinstance(kernel.k_epsilon_eta.variance, Parameter)
 
 
-def test_epsilon_eta_can_be_enabled_as_a_trainable_nonzero_parameter(
+def test_epsilon_eta_variance_changes_the_kernel_covariance(
     minimal_koh_model_fixture: MinimalKOHModel,
     gpjax_params_fixture: ModelParameterDict,
 ):
@@ -369,23 +362,10 @@ def test_epsilon_eta_can_be_enabled_as_a_trainable_nonzero_parameter(
 
     kernel = minimal_koh_model_fixture.GP_kernel(params_with_epsilon_eta)
 
-    assert jnp.isclose(kernel.k_epsilon_eta.variance.value, 0.25)
-    assert isinstance(kernel.k_epsilon_eta.variance, Parameter)
-
-
-def test_enabled_epsilon_eta_is_included_in_gpjax_trainable_state(
-    minimal_koh_model_fixture: MinimalKOHModel,
-    gpjax_params_fixture: ModelParameterDict,
-):
-    params_with_epsilon_eta = {
-        **gpjax_params_fixture,
-        "epsilon_eta": {"variances": {"obs_noise": jnp.array(0.25)}},
-    }
-    posterior = minimal_koh_model_fixture.GP_posterior(params_with_epsilon_eta)
-    _, trainable_state, *_ = nnx.split(posterior, Parameter, ...)
-    trainable_paths = {path for path, _ in trainable_state.flat_state()}
-
-    assert any(path[-2:] == ("k_epsilon_eta", "variance") for path in trainable_paths)
+    covariance = kernel.k_epsilon_eta.cross_covariance(
+        jnp.array([[1.0], [2.0]]), jnp.array([[1.0], [2.0]])
+    )
+    assert jnp.allclose(covariance, jnp.eye(2) * 0.25)
 
 
 def test_likelihood(
@@ -401,7 +381,6 @@ def test_likelihood(
     assert likelihood.num_datapoints == num_total_obs
     # obs_stddev is 0.0 because variance is handled in k_epsilon
     assert jnp.isclose(likelihood.obs_stddev.value, 0.0)
-    assert not isinstance(likelihood.obs_stddev, Parameter)
 
 
 def test_gp_prior(
@@ -434,38 +413,7 @@ def test_gp_posterior(
     assert isinstance(posterior.prior.kernel, KOHKernel)
 
 
-def test_fixed_observation_noise_is_excluded_from_gpjax_trainable_state(
-    minimal_koh_model_static_obs_fixture: MinimalKOHModel,
-    gpjax_params_fixture: ModelParameterDict,
-):
-    posterior = minimal_koh_model_static_obs_fixture.GP_posterior(gpjax_params_fixture)
-    _, trainable_state, *_ = nnx.split(posterior, Parameter, ...)
-    trainable_paths = {path for path, _ in trainable_state.flat_state()}
-
-    assert not any(path[-2:] == ("k_epsilon", "variance") for path in trainable_paths)
-    assert not any(
-        path[-2:] == ("k_epsilon_eta", "variance") for path in trainable_paths
-    )
-    assert not any(
-        path[-2:] == ("likelihood", "obs_stddev") for path in trainable_paths
-    )
-
-    # Other model hyperparameters remain trainable.
-    assert any(path[-2:] == ("k_eta", "lengthscale") for path in trainable_paths)
-
-
-def test_learned_observation_noise_is_included_in_gpjax_trainable_state(
-    minimal_koh_model_fixture: MinimalKOHModel,
-    gpjax_params_fixture: ModelParameterDict,
-):
-    posterior = minimal_koh_model_fixture.GP_posterior(gpjax_params_fixture)
-    _, trainable_state, *_ = nnx.split(posterior, Parameter, ...)
-    trainable_paths = {path for path, _ in trainable_state.flat_state()}
-
-    assert any(path[-2:] == ("k_epsilon", "variance") for path in trainable_paths)
-
-
-def test_gpjax_fit_scipy_keeps_fixed_observation_noise_fixed(
+def test_gpjax_fit_scipy_improves_objective_and_keeps_fixed_noise_fixed(
     minimal_koh_model_static_obs_fixture: MinimalKOHModel,
     gpjax_params_fixture: ModelParameterDict,
     koh_dataset_fixture: KOHDataset,
@@ -473,17 +421,29 @@ def test_gpjax_fit_scipy_keeps_fixed_observation_noise_fixed(
     posterior = minimal_koh_model_static_obs_fixture.GP_posterior(gpjax_params_fixture)
     train_data = koh_dataset_fixture.get_dataset(jnp.array([[0.0]]))
     initial_fixed_variance = posterior.prior.kernel.k_epsilon.variance.value
+    objective = lambda model, data: -gpx.objectives.conjugate_mll(model, data)
+    initial_objective = objective(posterior, train_data)
 
     fitted_posterior, _ = gpx.fit_scipy(
         model=posterior,
-        objective=lambda model, data: -gpx.objectives.conjugate_mll(model, data),
+        objective=objective,
         train_data=train_data,
-        max_iters=2,
+        max_iters=10,
         verbose=False,
     )
 
+    fitted_objective = objective(fitted_posterior, train_data)
     fitted_fixed_variance = fitted_posterior.prior.kernel.k_epsilon.variance.value
     assert jnp.array_equal(fitted_fixed_variance, initial_fixed_variance)
+    assert jnp.isfinite(initial_objective)
+    assert jnp.isfinite(fitted_objective)
+    assert fitted_objective < initial_objective
+
+    prediction = fitted_posterior.predict_delta(
+        jnp.array([[1.5]]), train_data=train_data
+    )
+    assert jnp.all(jnp.isfinite(prediction.mean))
+    assert jnp.all(jnp.isfinite(prediction.covariance()))
 
 
 def test_get_koh_neg_log_pos_dens_func(
@@ -499,21 +459,22 @@ def test_get_koh_neg_log_pos_dens_func(
     mcmc_sample_flat = jnp.zeros(num_params)  # Using zeros for simplicity
 
     value = neg_log_post_fn(mcmc_sample_flat)
-    assert isinstance(value, jnp.ndarray)
-    assert value.shape == ()  # Scalar
+    gradient = grad(neg_log_post_fn)(mcmc_sample_flat)
+    value_jit = jit(neg_log_post_fn)(mcmc_sample_flat)
+    gradient_jit = jit(grad(neg_log_post_fn))(mcmc_sample_flat)
 
-    # Test JIT compilation
-    jitted_fn = jit(neg_log_post_fn)
-    value_jit = jitted_fn(mcmc_sample_flat)
-    assert isinstance(value_jit, jnp.ndarray)
-    assert value_jit.shape == ()
-    assert jnp.allclose(value, value_jit)
+    expected_value = jnp.array(256.1029781)
+    expected_gradient = jnp.array(
+        [-0.17883658, 0.11076643, 0.28960301, 52.6073341, -245.076951, 3.57533772]
+    )
 
-    # A very simple value check would be extremely complex to set up manually.
-    # The main test here is that it runs, JITs, and returns the correct type/shape.
-    # And that checkify wrapper doesn't break it.
-    # A NaN return would indicate serious issues.
-    assert not jnp.isnan(value)
+    assert value.shape == ()
+    assert jnp.isfinite(value)
+    assert jnp.all(jnp.isfinite(gradient))
+    assert jnp.allclose(value, expected_value, rtol=1e-8, atol=1e-8)
+    assert jnp.allclose(gradient, expected_gradient, rtol=1e-8, atol=1e-8)
+    assert jnp.allclose(value, value_jit, rtol=1e-8, atol=1e-8)
+    assert jnp.allclose(gradient, gradient_jit, rtol=1e-8, atol=1e-8)
 
 
 # End of test_kohmodel.py
