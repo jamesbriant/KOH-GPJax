@@ -1,12 +1,9 @@
-from jax import config  # Re-adding config for early x64 enabling
-
-config.update("jax_enable_x64", True)  # Needs to be before JAX ops at global scope
-
 import gpjax as gpx
 
 # import numpy as np # No longer needed for np.loadtxt
 import numpyro.distributions as npd
 from jax import (
+    grad,
     jit,
 )
 from jax import (
@@ -147,10 +144,10 @@ model = MyModel(
 #     print(f"DEBUG: Index {i_debug}: Path: {jtu.keystr(path_debug)}")
 
 
-def test_neg_log_posterior_density_runs():
-    """Tests that the negative log posterior density function runs and returns a scalar."""
+def test_neg_log_posterior_density_has_stable_value_and_gradient():
+    """The end-to-end posterior density has a stable eager/JIT contract."""
     # model and model_params are now global in this test file scope
-    f = jit(model.get_KOH_neg_log_pos_dens_func())
+    f = model.get_KOH_neg_log_pos_dens_func()
 
     # Determine the number of parameters from the model_params fixture
     # Original prior_dict (after correction to be dicts of PPs):
@@ -183,14 +180,33 @@ def test_neg_log_posterior_density_runs():
         f"mcmc_params length {len(mcmc_params)} != n_params {model_params.n_params}"
     )
 
-    result = f(jnp.array(mcmc_params, dtype=jnp.float64))  # Ensure it's a JAX array
-    print(f"Computed -log posterior density: {result}")
-    # Original value was 707.3885600290141 with different data and potentially different prior structure.
-    # With new data and structure, the value will differ.
-    # The key is that it runs and returns a scalar float without NaN.
-    assert isinstance(result, jnp.ndarray)
-    assert result.shape == ()  # Scalar
-    assert not jnp.isnan(result)
+    params = jnp.array(mcmc_params, dtype=jnp.float64)
+    value = f(params)
+    gradient = grad(f)(params)
+    value_jit = jit(f)(params)
+    gradient_jit = jit(grad(f))(params)
+
+    expected_value = jnp.array(286.5928707380916)
+    expected_gradient = jnp.array(
+        [
+            0.1,
+            -10.4626079968717,
+            -10.0626079968717,
+            -234.9789838509808,
+            -0.08681552515755797,
+            -123.5346586742981,
+            -246.1371217568226,
+            -7.250765241803173,
+        ]
+    )
+
+    assert value.shape == ()
+    assert jnp.isfinite(value)
+    assert jnp.all(jnp.isfinite(gradient))
+    assert jnp.allclose(value, expected_value, rtol=1e-8, atol=1e-8)
+    assert jnp.allclose(gradient, expected_gradient, rtol=1e-8, atol=1e-8)
+    assert jnp.allclose(value, value_jit, rtol=1e-8, atol=1e-8)
+    assert jnp.allclose(gradient, gradient_jit, rtol=1e-8, atol=1e-8)
 
 
 # End of test_integration_posterior_density.py
