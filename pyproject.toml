@@ -58,7 +58,7 @@ docs = [
   "ipykernel",
   "ipywidgets",
   "matplotlib",
-  "mkdocs",
+  "properdocs",
   "mkdocs-gen-files",
   "mkdocs-include-markdown-plugin",
   "mkdocs-jupyter",
@@ -147,29 +147,3 @@ fail_under = 70
 precision = 1
 show_missing = true
 skip_covered = true
-
-[tool.tox]
-env_list = [
-    "py311",
-    "py312",
-]
-env_run_base = {commands = [
-    [
-        "pytest",
-        "--cov",
-        "--cov-report=xml",
-    ],
-], dependency_groups = [
-    "test",
-]}
-env.docs = {commands = [
-    [
-        "mkdocs",
-        "build",
-        "--strict",
-    ],
-], dependency_groups = [
-    "docs",
-]}
-gh.python."3.11" = ["py311"]
-gh.python."3.12" = ["py312"]
