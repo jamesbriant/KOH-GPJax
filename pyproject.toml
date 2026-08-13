@@ -30,82 +30,52 @@ dependencies = [
   "jaxtyping",
   "numpyro",
 ]
-optional-dependencies = {docs = [
-    "mkdocs",
-    "mkdocs-gen-files",
-    "mkdocs-literate-nav",
-    "mkdocs-include-markdown-plugin",
-    "mkdocs-material",
-    "mkdocstrings",
-    "mkdocstrings-python",
-    "mkdocs-jupyter",
-    # "mkdocs-git-authors-plugin",
-    "pymdown-extensions",
-], test = [
-    "pytest",
-    "pytest-cov",
-]}
-
 [project.urls]
 Documentation = "https://github.com/jamesbriant/koh-gpjax"
 Issues = "https://github.com/jamesbriant/koh-gpjax/issues"
 Source = "https://github.com/jamesbriant/koh-gpjax"
 
-[tool.hatch.version]
-path = "kohgpjax/__init__.py"
-
-[tool.hatch.envs.default]
-installer = "uv"
-python = "3.11"
-
-[tool.hatch.envs.docs]
-dependencies = [
-  "jupytext",
-  "ipykernel",
-  "ipywidgets",
-  "nbconvert",
-  "matplotlib",
-]
-python = "3.11"
-
-[tool.hatch.envs.docs.scripts]
-build = ["python docs/scripts/gen_examples.py --execute"]
-
-[tool.hatch.envs.dev]
-# Dependencies have been simplified. `ruff` handles formatting, linting, and import sorting.
-# `black`, `isort`, and `autoflake` have been removed.
-dependencies = [
-  "ruff>=0.6",
-  "pre-commit>=3.2.2",
-  "interrogate>=1.5.0",
-  "codespell>=2.2.4",
+[dependency-groups]
+test = [
+  "coverage>=7.2.2",
+  "mktestdocs>=0.2.1",
   "pytest>=7.2.2",
+  "pytest-beartype",
   "pytest-cov>=4.0.0",
   "pytest-pretty>=1.1.1",
   "pytest-xdist>=3.2.1",
-  "coverage>=7.2.2",
-  "absolufy-imports>=0.3.1",
   "xdoctest>=1.1.1",
-  "mktestdocs>=0.2.1",
-  "jupytext",
-  "pytest-beartype",
 ]
-python = "3.11"
+lint = [
+  "absolufy-imports>=0.3.1",
+  "codespell>=2.2.4",
+  "interrogate>=1.5.0",
+  "jupytext",
+  "pre-commit>=3.2.2",
+  "ruff>=0.6",
+]
+docs = [
+  "ipykernel",
+  "ipywidgets",
+  "matplotlib",
+  "mkdocs",
+  "mkdocs-gen-files",
+  "mkdocs-include-markdown-plugin",
+  "mkdocs-jupyter",
+  "mkdocs-literate-nav",
+  "mkdocs-material",
+  "mkdocstrings",
+  "mkdocstrings-python",
+  "nbconvert",
+  "pymdown-extensions",
+]
+dev = [
+  { include-group = "test" },
+  { include-group = "lint" },
+]
 
-[tool.hatch.envs.dev.scripts]
-# Scripts are now consolidated to use ruff for both linting and formatting.
-# `ruff format` handles code formatting (replacing black) and jupytext formatting.
-# `ruff check --fix` handles linting, import sorting (replacing isort), and removing unused variables (replacing autoflake).
-format = ['ruff format ./kohgpjax ./tests ./examples', 'jupytext --pipe "ruff format -" examples/*.py || true']
-check = ['ruff check --fix ./kohgpjax ./tests ./examples || true']
-
-# Testing scripts remain the same.
-test = "pytest . -v -n 4 --beartype-packages='kohgpjax'"
-coverage = "pytest . -v --cov=./kohgpjax --cov-report=xml:./coverage.xml"
-docstrings = "xdoctest ./kohgpjax"
-all-tests = ['check', 'docstrings', 'test']
-
-# The [tool.black] section is no longer needed and has been removed.
+[tool.hatch.version]
+path = "kohgpjax/__init__.py"
 
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::DeprecationWarning"]
@@ -114,7 +84,7 @@ xfail_strict = true
 
 # Ruff configuration now includes formatting options and import sorting rules.
 [tool.ruff]
-fix = true
+fix = false
 cache-dir = "~/.cache/ruff"
 exclude = ["docs/", "examples/"]
 line-length = 88
@@ -135,7 +105,7 @@ select = [
   "F", "E", "W", "I", "YTT", "B", "Q", "PLE", "PLR", "PLW", "PIE", "PYI", "TID", "ISC"
 ]
 ignore = [
-  "B008", "E402", "E731", "E501", "S303", "S307", "RET504", "S101", "F722", "PLR2004", "PLR0913"
+  "B008", "E402", "E731", "E501", "S303", "S307", "RET504", "S101", "F722", "PLR2004", "PLR0912", "PLR0913", "PLR0917"
 ]
 unfixable = ["ERA001", "F401", "F841", "T201", "T203"]
 
@@ -189,7 +159,7 @@ env_run_base = {commands = [
         "--cov",
         "--cov-report=xml",
     ],
-], extras = [
+], dependency_groups = [
     "test",
 ]}
 env.docs = {commands = [
@@ -198,7 +168,7 @@ env.docs = {commands = [
         "build",
         "--strict",
     ],
-], extras = [
+], dependency_groups = [
     "docs",
 ]}
 gh.python."3.11" = ["py311"]
