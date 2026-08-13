@@ -3,11 +3,9 @@ import pytest
 from jax import config
 
 
-@pytest.fixture(autouse=True)
-def enable_x64_for_all_tests():
-    """Ensures JAX float64 precision is enabled for all tests."""
+def pytest_configure():
+    """Enable the suite's documented float64 numerical contract at startup."""
     config.update("jax_enable_x64", True)
-    # No yield needed as this is a configuration applied globally before tests run.
 
 
 @pytest.fixture(scope="session")
