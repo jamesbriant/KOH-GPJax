@@ -9,7 +9,6 @@ kohgpjax.egg-info/
 coverage.xml
 
 environment.yml
-uv.lock
 
 *.npz
 *.npy
