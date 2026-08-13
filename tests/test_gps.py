@@ -94,6 +94,25 @@ def test_construct_posterior_returns_conjugateposterior(
 
 # --- Tests for KOHPosterior ---
 
+# Baseline snapshots for the deterministic fixtures above. These values were
+# calculated once with the pre-hardening implementation and are intentionally
+# kept out of the prediction implementation under test.
+EXPECTED_ETA_MEAN = jnp.array([0.19217981, 0.40880302])
+EXPECTED_ETA_COVARIANCE = jnp.array(
+    [[0.84836161, -0.00119397], [-0.00119397, 0.84595143]]
+)
+EXPECTED_ZETA_MEAN = jnp.array([0.38435961, 0.81202578])
+EXPECTED_ZETA_COVARIANCE = jnp.array(
+    [[1.39344343, -0.04140708], [-0.04140708, 1.38378654]]
+)
+EXPECTED_ZETA_WITH_NOISE_COVARIANCE = jnp.array(
+    [[2.39344343, -0.04140708], [-0.04140708, 2.38378654]]
+)
+EXPECTED_DELTA_MEAN = jnp.array([0.19217980, 0.40322276])
+EXPECTED_DELTA_COVARIANCE = jnp.array(
+    [[0.84836161, -0.00119393], [-0.00119393, 0.84594150]]
+)
+
 
 def test_koh_posterior_inheritance():
     assert issubclass(KOHPosterior, gpx.gps.AbstractPosterior)
@@ -115,7 +134,16 @@ def test_koh_posterior_predict_raises_not_implemented(
         posterior.predict(test_input_points_fixture, train_data=mock_dataset_fixture)
 
 
-def test_koh_posterior_predict_eta_type(
+def _assert_valid_gaussian_prediction(prediction, expected_mean, expected_covariance):
+    assert isinstance(prediction, GaussianDistribution)
+    assert jnp.allclose(prediction.mean, expected_mean, rtol=1e-7, atol=1e-8)
+    actual_covariance = prediction.covariance()
+    assert jnp.allclose(actual_covariance, expected_covariance, rtol=1e-7, atol=1e-8)
+    assert jnp.allclose(actual_covariance, actual_covariance.T, atol=1e-8)
+    assert jnp.all(jnp.linalg.eigvalsh(actual_covariance) >= -1e-7)
+
+
+def test_koh_posterior_predict_eta(
     mock_prior_fixture: gpx.gps.Prior,
     mock_likelihood_fixture: gpx.likelihoods.Gaussian,
     test_input_points_fixture: jnp.ndarray,
@@ -125,18 +153,12 @@ def test_koh_posterior_predict_eta_type(
     prediction = posterior.predict_eta(
         test_input_points_fixture, train_data=mock_dataset_fixture
     )
-    assert isinstance(prediction, GaussianDistribution)
-    # Check shapes based on test_input_points_fixture
-    assert prediction.mean.shape == (
-        test_input_points_fixture.shape[0],
-    )  # Mean is 1D if output dim is 1
-    assert prediction.covariance().shape == (
-        test_input_points_fixture.shape[0],
-        test_input_points_fixture.shape[0],
+    _assert_valid_gaussian_prediction(
+        prediction, EXPECTED_ETA_MEAN, EXPECTED_ETA_COVARIANCE
     )
 
 
-def test_koh_posterior_predict_zeta_type(
+def test_koh_posterior_predict_zeta(
     mock_prior_fixture: gpx.gps.Prior,
     mock_likelihood_fixture: gpx.likelihoods.Gaussian,
     test_input_points_fixture: jnp.ndarray,
@@ -149,13 +171,8 @@ def test_koh_posterior_predict_zeta_type(
         train_data=mock_dataset_fixture,
         include_observation_noise=False,
     )
-    assert isinstance(prediction_false, GaussianDistribution)
-    assert prediction_false.mean.shape == (
-        test_input_points_fixture.shape[0],
-    )  # Mean is 1D
-    assert prediction_false.covariance().shape == (
-        test_input_points_fixture.shape[0],
-        test_input_points_fixture.shape[0],
+    _assert_valid_gaussian_prediction(
+        prediction_false, EXPECTED_ZETA_MEAN, EXPECTED_ZETA_COVARIANCE
     )
 
     # Test with include_observation_noise = True
@@ -164,48 +181,55 @@ def test_koh_posterior_predict_zeta_type(
         train_data=mock_dataset_fixture,
         include_observation_noise=True,
     )
-    assert isinstance(prediction_true, GaussianDistribution)
-    assert prediction_true.mean.shape == (
-        test_input_points_fixture.shape[0],
-    )  # Mean is 1D
-    assert prediction_true.covariance().shape == (
-        test_input_points_fixture.shape[0],
-        test_input_points_fixture.shape[0],
+    _assert_valid_gaussian_prediction(
+        prediction_true,
+        EXPECTED_ZETA_MEAN,
+        EXPECTED_ZETA_WITH_NOISE_COVARIANCE,
     )
 
     # Adding observation noise must add precisely the epsilon kernel's
     # covariance to the latent zeta predictive covariance.
-    expected_noise = mock_prior_fixture.kernel.k_epsilon.cross_covariance(
-        test_input_points_fixture, test_input_points_fixture
-    )
     assert jnp.allclose(
         prediction_true.covariance() - prediction_false.covariance(),
-        expected_noise,
+        EXPECTED_ZETA_WITH_NOISE_COVARIANCE - EXPECTED_ZETA_COVARIANCE,
         atol=1e-5,
     )
 
     # Check JIT compilability
     # JIT with static include_observation_noise works for both False and True
-    jitted_predict_zeta_static = jit(
-        posterior.predict_zeta, static_argnames="include_observation_noise"
+    def prediction_moments(test_inputs, train_data, include_observation_noise):
+        prediction = posterior.predict_zeta(
+            test_inputs,
+            train_data=train_data,
+            include_observation_noise=include_observation_noise,
+        )
+        return prediction.mean, prediction.covariance()
+
+    jitted_moments = jit(
+        prediction_moments, static_argnames="include_observation_noise"
     )
 
-    prediction_jit_false = jitted_predict_zeta_static(
-        test_input_points_fixture,
-        train_data=mock_dataset_fixture,
-        include_observation_noise=False,
+    jit_mean_false, jit_covariance_false = jitted_moments(
+        test_input_points_fixture, mock_dataset_fixture, False
     )
-    assert isinstance(prediction_jit_false, GaussianDistribution)
-
-    prediction_jit_true = jitted_predict_zeta_static(
-        test_input_points_fixture,
-        train_data=mock_dataset_fixture,
-        include_observation_noise=True,
+    assert jnp.allclose(jit_mean_false, EXPECTED_ZETA_MEAN, rtol=1e-7, atol=1e-8)
+    assert jnp.allclose(
+        jit_covariance_false, EXPECTED_ZETA_COVARIANCE, rtol=1e-7, atol=1e-8
     )
-    assert isinstance(prediction_jit_true, GaussianDistribution)
+
+    jit_mean_true, jit_covariance_true = jitted_moments(
+        test_input_points_fixture, mock_dataset_fixture, True
+    )
+    assert jnp.allclose(jit_mean_true, EXPECTED_ZETA_MEAN, rtol=1e-7, atol=1e-8)
+    assert jnp.allclose(
+        jit_covariance_true,
+        EXPECTED_ZETA_WITH_NOISE_COVARIANCE,
+        rtol=1e-7,
+        atol=1e-8,
+    )
 
 
-def test_koh_posterior_predict_obs_type(
+def test_koh_posterior_predict_obs(
     mock_prior_fixture: gpx.gps.Prior,
     mock_likelihood_fixture: gpx.likelihoods.Gaussian,
     test_input_points_fixture: jnp.ndarray,
@@ -215,11 +239,8 @@ def test_koh_posterior_predict_obs_type(
     prediction = posterior.predict_obs(
         test_input_points_fixture, train_data=mock_dataset_fixture
     )
-    assert isinstance(prediction, GaussianDistribution)
-    assert prediction.mean.shape == (test_input_points_fixture.shape[0],)  # Mean is 1D
-    assert prediction.covariance().shape == (
-        test_input_points_fixture.shape[0],
-        test_input_points_fixture.shape[0],
+    _assert_valid_gaussian_prediction(
+        prediction, EXPECTED_ZETA_MEAN, EXPECTED_ZETA_WITH_NOISE_COVARIANCE
     )
 
 
@@ -234,47 +255,40 @@ def test_koh_posterior_predict_delta_has_delta_only_prior_covariance(
         test_input_points_fixture, train_data=mock_dataset_fixture
     )
 
-    assert isinstance(prediction, GaussianDistribution)
-    assert prediction.mean.shape == (test_input_points_fixture.shape[0],)
-    assert prediction.covariance().shape == (
-        test_input_points_fixture.shape[0],
-        test_input_points_fixture.shape[0],
+    _assert_valid_gaussian_prediction(
+        prediction, EXPECTED_DELTA_MEAN, EXPECTED_DELTA_COVARIANCE
     )
-    assert jnp.allclose(prediction.covariance(), prediction.covariance().T, atol=1e-6)
-    assert jnp.all(jnp.linalg.eigvalsh(prediction.covariance()) >= -1e-5)
 
-    # Independently reproduce the Gaussian conditioning calculation. The
-    # cross-covariance for delta is non-zero only for field observations.
-    x, y = mock_dataset_fixture.X, mock_dataset_fixture.y
-    num_field_obs = mock_prior_fixture.kernel.num_field_obs
-    kxx = mock_prior_fixture.kernel.cross_covariance(x, x)
-    kxt = jnp.pad(
-        mock_prior_fixture.kernel.k_delta.cross_covariance(
-            x[:num_field_obs], test_input_points_fixture
+
+def test_predict_delta_is_zero_when_discrepancy_kernel_has_zero_variance(
+    mock_likelihood_fixture: gpx.likelihoods.Gaussian,
+    test_input_points_fixture: jnp.ndarray,
+    mock_dataset_fixture: Dataset,
+):
+    """The discrepancy prediction depends only on the discrepancy kernel."""
+    prior = gpx.gps.Prior(
+        mean_function=gpx.mean_functions.Zero(),
+        kernel=KOHKernel(
+            num_field_obs=2,
+            num_sim_obs=2,
+            k_eta=gpx.kernels.RBF(),
+            k_delta=gpx.kernels.RBF(variance=0.0),
+            k_epsilon=gpx.kernels.White(),
+            k_epsilon_eta=gpx.kernels.White(variance=0.01),
         ),
-        ((0, x.shape[0] - num_field_obs), (0, 0)),
     )
-    ktt = mock_prior_fixture.kernel.k_delta.cross_covariance(
-        test_input_points_fixture, test_input_points_fixture
-    )
-    obs_var = mock_likelihood_fixture.obs_stddev.value**2
-    kxx = kxx + jnp.diag(
-        jnp.pad(
-            jnp.ones(num_field_obs) * obs_var,
-            (0, x.shape[0] - num_field_obs),
-        )
-    )
-    kxx = kxx + jnp.eye(x.shape[0]) * posterior.prior.jitter
-    solved_kxt = jnp.linalg.solve(kxx, kxt)
-    expected_mean = solved_kxt.T @ y
-    expected_covariance = ktt - kxt.T @ solved_kxt
-    expected_covariance = (
-        expected_covariance
-        + jnp.eye(test_input_points_fixture.shape[0]) * posterior.prior.jitter
+    posterior = construct_posterior(prior, mock_likelihood_fixture)
+
+    prediction = posterior.predict_delta(
+        test_input_points_fixture, train_data=mock_dataset_fixture
     )
 
-    assert jnp.allclose(prediction.mean, expected_mean.squeeze(), atol=1e-5)
-    assert jnp.allclose(prediction.covariance(), expected_covariance, atol=1e-5)
+    expected_covariance = jnp.eye(test_input_points_fixture.shape[0]) * prior.jitter
+    assert isinstance(prediction, GaussianDistribution)
+    assert jnp.allclose(prediction.mean, 0.0, atol=1e-12)
+    assert jnp.allclose(
+        prediction.covariance(), expected_covariance, rtol=1e-7, atol=1e-12
+    )
 
 
 def test_koh_posterior_pytree(
@@ -295,6 +309,3 @@ def test_koh_posterior_pytree(
         reconstructed_posterior.prior.kernel.num_field_obs
         == posterior.prior.kernel.num_field_obs
     )
-
-
-# End of test_gps.py
