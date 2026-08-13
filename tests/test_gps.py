@@ -5,7 +5,6 @@ from gpjax.distributions import GaussianDistribution
 from jax import jit  # Removed 'config'
 from jax import numpy as jnp
 from jax import tree_util as jtu
-
 from kohgpjax.gps import KOHPosterior, construct_posterior
 from kohgpjax.kernels.kohkernel import KOHKernel  # Needed for the prior fixture
 
@@ -241,9 +240,7 @@ def test_koh_posterior_predict_delta_has_delta_only_prior_covariance(
         test_input_points_fixture.shape[0],
         test_input_points_fixture.shape[0],
     )
-    assert jnp.allclose(
-        prediction.covariance(), prediction.covariance().T, atol=1e-6
-    )
+    assert jnp.allclose(prediction.covariance(), prediction.covariance().T, atol=1e-6)
     assert jnp.all(jnp.linalg.eigvalsh(prediction.covariance()) >= -1e-5)
 
     # Independently reproduce the Gaussian conditioning calculation. The
@@ -271,14 +268,13 @@ def test_koh_posterior_predict_delta_has_delta_only_prior_covariance(
     solved_kxt = jnp.linalg.solve(kxx, kxt)
     expected_mean = solved_kxt.T @ y
     expected_covariance = ktt - kxt.T @ solved_kxt
-    expected_covariance = expected_covariance + jnp.eye(
-        test_input_points_fixture.shape[0]
-    ) * posterior.prior.jitter
+    expected_covariance = (
+        expected_covariance
+        + jnp.eye(test_input_points_fixture.shape[0]) * posterior.prior.jitter
+    )
 
     assert jnp.allclose(prediction.mean, expected_mean.squeeze(), atol=1e-5)
-    assert jnp.allclose(
-        prediction.covariance(), expected_covariance, atol=1e-5
-    )
+    assert jnp.allclose(prediction.covariance(), expected_covariance, atol=1e-5)
 
 
 def test_koh_posterior_pytree(

@@ -388,9 +388,7 @@ def test_parameter_prior_non_identity_bijector():
         ),
     ],
 )
-def test_model_parameters_rejects_malformed_nested_prior_dicts(
-    bad_group, message
-):
+def test_model_parameters_rejects_malformed_nested_prior_dicts(bad_group, message):
     prior_dict = {
         "thetas": {"theta": ParameterPrior(npd.Normal(0, 1))},
         "eta": bad_group,
@@ -469,16 +467,12 @@ def test_model_parameters_transformed_log_prior_has_finite_correct_gradient():
         {
             "thetas": {"theta": ParameterPrior(npd.Normal(0.0, 1.0))},
             "eta": {
-                "variances": {
-                    "variance": ParameterPrior(npd.Exponential(rate=1.0))
-                }
+                "variances": {"variance": ParameterPrior(npd.Exponential(rate=1.0))}
             },
             "delta": {
                 "variances": {"variance": ParameterPrior(npd.LogNormal(0.0, 1.0))}
             },
-            "epsilon": {
-                "variances": {"noise": ParameterPrior(npd.HalfNormal(1.0))}
-            },
+            "epsilon": {"variances": {"noise": ParameterPrior(npd.HalfNormal(1.0))}},
         }
     )
     log_prior = params.get_log_prior_func()
