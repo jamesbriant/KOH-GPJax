@@ -989,7 +989,7 @@ requires-dist = [
     { name = "beartype" },
     { name = "cola-ml" },
     { name = "flax" },
-    { name = "gpjax", specifier = ">0.11.0,<=0.12.2" },
+    { name = "gpjax", specifier = ">0.11.1,<=0.12.2" },
     { name = "jax", specifier = ">=0.5.0,<0.7" },
     { name = "jaxlib", specifier = ">=0.5.0,<0.7" },
     { name = "jaxtyping" },
