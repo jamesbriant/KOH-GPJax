@@ -8,6 +8,17 @@ By combining the power of [Jax](https://jax.readthedocs.io/en/latest/) with the 
 
 This package is a work in progress. Please get in touch if you're interested in contributing or using the package.
 
+## Compatibility policy
+
+The next compatibility target is GPJax `0.18.x`, beginning with `0.18.0`.
+Once the corresponding API migration is complete, KOH-GPJax will publish and
+test the range `gpjax>=0.18.0,<0.19.0` on Python 3.11 and 3.12. Continuous
+integration will test the locked development environment and a fresh resolve
+of each GPJax version claimed by the package metadata.
+
+Until that migration is released, the current GPJax `0.12.x` constraints in
+`pyproject.toml` remain the supported runtime configuration.
+
 ## Installation
 
 Currently only available on GitHub.
@@ -130,16 +141,16 @@ Load the field and simulation data into `KOHDataset`:
 
 ```python
 # filepath: /script.py
-from jax import config
-config.update("jax_enable_x64", True)
-
-import numpy as np
-import jax.numpy as jnp
 import gpjax as gpx
+import jax.numpy as jnp
+from jax import config
+import numpy as np
 from kohgpjax.dataset import KOHDataset
 
-DATAFIELD = np.loadtxt('field.csv', delimiter=',', dtype=np.float32)
-DATASIM = np.loadtxt('sim.csv', delimiter=',', dtype=np.float32)
+config.update("jax_enable_x64", True)
+
+DATAFIELD = np.loadtxt("field.csv", delimiter=",", dtype=np.float32)
+DATASIM = np.loadtxt("sim.csv", delimiter=",", dtype=np.float32)
 
 xf = jnp.reshape(DATAFIELD[:, 0], (-1, 1)).astype(jnp.float64)
 xc = jnp.reshape(DATASIM[:, 0], (-1, 1)).astype(jnp.float64)

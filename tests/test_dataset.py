@@ -1,11 +1,8 @@
 import pytest
 from gpjax.dataset import Dataset
-from jax import config
 from jax import numpy as jnp
 from jax import tree_util as jtu
 from kohgpjax.dataset import KOHDataset
-
-config.update("jax_enable_x64", True)
 
 # --- Fixtures ---
 
