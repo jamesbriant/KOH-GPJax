@@ -47,9 +47,7 @@ jobs:
       matrix:
         include:
           # Test every released GPJax version allowed by
-          # `gpjax>0.11.0,<=0.12.2` on the primary Python version.
-          - python-version: "3.11"
-            gpjax-version: "0.11.1"
+          # `gpjax>0.11.1,<=0.12.2` on the primary Python version.
           - python-version: "3.11"
             gpjax-version: "0.11.2"
           - python-version: "3.11"
