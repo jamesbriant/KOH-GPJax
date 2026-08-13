@@ -20,9 +20,7 @@ def field_data_input():
 @pytest.fixture(scope="module")
 def sim_data_input():
     # x_sim has 2 variable params and 2 calibration params
-    x_sim = jnp.array(
-        [[1.0, 2.0, 3.0, 2.0], [4.0, 5.0, 6.0, 3.0]], dtype=jnp.float64
-    )
+    x_sim = jnp.array([[1.0, 2.0, 3.0, 2.0], [4.0, 5.0, 6.0, 3.0]], dtype=jnp.float64)
     y_sim = jnp.array([[1.0], [2.0]], dtype=jnp.float64)
     return Dataset(x_sim, y_sim)
 

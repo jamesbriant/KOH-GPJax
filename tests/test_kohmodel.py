@@ -4,10 +4,7 @@ import pytest
 from flax import nnx
 from gpjax.dataset import Dataset  # Corrected import
 from gpjax.parameters import Parameter
-from jax import config
-from jax import (  # Removed 'config'
-    jit,
-)
+from jax import config, jit
 from jax import (
     numpy as jnp,
 )
@@ -261,9 +258,7 @@ def test_static_and_learned_observation_noise_have_distinct_numeric_covariances(
         },
     }
     learned_kernel = minimal_koh_model_fixture.k_epsilon(learned_params)
-    static_kernel = minimal_koh_model_static_obs_fixture.k_epsilon(
-        gpjax_params_fixture
-    )
+    static_kernel = minimal_koh_model_static_obs_fixture.k_epsilon(gpjax_params_fixture)
 
     learned_covariance = learned_kernel.cross_covariance(
         koh_dataset_fixture.Xf, koh_dataset_fixture.Xf
@@ -272,8 +267,12 @@ def test_static_and_learned_observation_noise_have_distinct_numeric_covariances(
         koh_dataset_fixture.Xf, koh_dataset_fixture.Xf
     )
 
-    assert jnp.allclose(learned_covariance, jnp.eye(koh_dataset_fixture.num_field_obs) * 0.25)
-    assert jnp.allclose(static_covariance, jnp.eye(koh_dataset_fixture.num_field_obs) * 0.01)
+    assert jnp.allclose(
+        learned_covariance, jnp.eye(koh_dataset_fixture.num_field_obs) * 0.25
+    )
+    assert jnp.allclose(
+        static_covariance, jnp.eye(koh_dataset_fixture.num_field_obs) * 0.01
+    )
     assert not jnp.allclose(learned_covariance, static_covariance)
 
 
@@ -386,9 +385,7 @@ def test_enabled_epsilon_eta_is_included_in_gpjax_trainable_state(
     _, trainable_state, *_ = nnx.split(posterior, Parameter, ...)
     trainable_paths = {path for path, _ in trainable_state.flat_state()}
 
-    assert any(
-        path[-2:] == ("k_epsilon_eta", "variance") for path in trainable_paths
-    )
+    assert any(path[-2:] == ("k_epsilon_eta", "variance") for path in trainable_paths)
 
 
 def test_likelihood(
@@ -441,19 +438,17 @@ def test_fixed_observation_noise_is_excluded_from_gpjax_trainable_state(
     minimal_koh_model_static_obs_fixture: MinimalKOHModel,
     gpjax_params_fixture: ModelParameterDict,
 ):
-    posterior = minimal_koh_model_static_obs_fixture.GP_posterior(
-        gpjax_params_fixture
-    )
+    posterior = minimal_koh_model_static_obs_fixture.GP_posterior(gpjax_params_fixture)
     _, trainable_state, *_ = nnx.split(posterior, Parameter, ...)
     trainable_paths = {path for path, _ in trainable_state.flat_state()}
 
-    assert not any(
-        path[-2:] == ("k_epsilon", "variance") for path in trainable_paths
-    )
+    assert not any(path[-2:] == ("k_epsilon", "variance") for path in trainable_paths)
     assert not any(
         path[-2:] == ("k_epsilon_eta", "variance") for path in trainable_paths
     )
-    assert not any(path[-2:] == ("likelihood", "obs_stddev") for path in trainable_paths)
+    assert not any(
+        path[-2:] == ("likelihood", "obs_stddev") for path in trainable_paths
+    )
 
     # Other model hyperparameters remain trainable.
     assert any(path[-2:] == ("k_eta", "lengthscale") for path in trainable_paths)
@@ -467,9 +462,7 @@ def test_learned_observation_noise_is_included_in_gpjax_trainable_state(
     _, trainable_state, *_ = nnx.split(posterior, Parameter, ...)
     trainable_paths = {path for path, _ in trainable_state.flat_state()}
 
-    assert any(
-        path[-2:] == ("k_epsilon", "variance") for path in trainable_paths
-    )
+    assert any(path[-2:] == ("k_epsilon", "variance") for path in trainable_paths)
 
 
 def test_gpjax_fit_scipy_keeps_fixed_observation_noise_fixed(
@@ -477,9 +470,7 @@ def test_gpjax_fit_scipy_keeps_fixed_observation_noise_fixed(
     gpjax_params_fixture: ModelParameterDict,
     koh_dataset_fixture: KOHDataset,
 ):
-    posterior = minimal_koh_model_static_obs_fixture.GP_posterior(
-        gpjax_params_fixture
-    )
+    posterior = minimal_koh_model_static_obs_fixture.GP_posterior(gpjax_params_fixture)
     train_data = koh_dataset_fixture.get_dataset(jnp.array([[0.0]]))
     initial_fixed_variance = posterior.prior.kernel.k_epsilon.variance.value
 

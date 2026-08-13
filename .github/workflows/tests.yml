@@ -13,29 +13,81 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version:
-          - "3.11"
-          - "3.12"
+        include:
+          - python-version: "3.11"
+            pytest-command: "pytest -q"
+          - python-version: "3.12"
+            pytest-command: "pytest --cov --cov-report=xml -q"
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
 
-      - name: Cache tox
-        uses: actions/cache@v5
-        with:
-          path: .tox
-          key: tox-${{hashFiles('pyproject.toml') }}
-
       - name: Set up python
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: pyproject.toml
 
-      - name: Install dependencies
-        run: python -m pip install tox tox-gh
+      - name: Set up uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
 
-      - name: Test with tox
-        run: tox run
+      - name: Sync locked test environment
+        run: uv sync --locked --group test
+
+      - name: Run tests
+        run: uv run --locked --group test ${{ matrix.pytest-command }}
+
+  compatibility:
+    name: GPJax ${{ matrix.gpjax-version }} / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Test every released GPJax version allowed by
+          # `gpjax>0.11.1,<=0.12.2` on the primary Python version.
+          - python-version: "3.11"
+            gpjax-version: "0.11.2"
+          - python-version: "3.11"
+            gpjax-version: "0.12.0"
+          - python-version: "3.11"
+            gpjax-version: "0.12.2"
+          # Also test the newest supported GPJax release on every supported
+          # Python version.
+          - python-version: "3.12"
+            gpjax-version: "0.12.2"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+
+      - name: Create compatibility environment
+        run: uv venv --python ${{ matrix.python-version }} .venv-compat
+
+      - name: Resolve the exact supported dependency set
+        run: >-
+          uv pip install --python .venv-compat/bin/python --group test .
+          "gpjax==${{ matrix.gpjax-version }}"
+
+      - name: Report resolved versions
+        run: >-
+          .venv-compat/bin/python -c
+          "import gpjax, jax, jaxlib;
+          print(f'gpjax={gpjax.__version__}');
+          print(f'jax={jax.__version__}');
+          print(f'jaxlib={jaxlib.__version__}')"
+
+      - name: Run compatibility tests
+        run: .venv-compat/bin/python -m pytest -q
