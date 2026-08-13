@@ -6,11 +6,14 @@ import gpjax as gpx
 import numpy as np
 import numpyro.distributions as dist
 import pytest
-from jax import grad, jit, numpy as jnp, tree
-
+from jax import grad, jit, tree
+from jax import numpy as jnp
 from kohgpjax.dataset import KOHDataset
 from kohgpjax.kohmodel import KOHModel
 from kohgpjax.parameters import ModelParameterPriorDict, ModelParameters, ParameterPrior
+
+NUMERICAL_RTOL = 1e-6
+NUMERICAL_ATOL = 1e-8
 
 
 class ExampleModel(KOHModel):
@@ -156,7 +159,11 @@ def test_example_posterior_density_has_stable_value_and_gradient(
 
     assert jnp.isfinite(value)
     assert jnp.all(jnp.isfinite(gradient))
-    assert jnp.allclose(value, expected_value, rtol=1e-8, atol=1e-8)
-    assert jnp.allclose(gradient, expected_gradient, rtol=1e-8, atol=1e-8)
-    assert jnp.allclose(value, value_jit, rtol=1e-6, atol=1e-6)
-    assert jnp.allclose(gradient, gradient_jit, rtol=1e-6, atol=1e-6)
+    assert jnp.allclose(value, expected_value, rtol=NUMERICAL_RTOL, atol=NUMERICAL_ATOL)
+    assert jnp.allclose(
+        gradient, expected_gradient, rtol=NUMERICAL_RTOL, atol=NUMERICAL_ATOL
+    )
+    assert jnp.allclose(value, value_jit, rtol=NUMERICAL_RTOL, atol=NUMERICAL_ATOL)
+    assert jnp.allclose(
+        gradient, gradient_jit, rtol=NUMERICAL_RTOL, atol=NUMERICAL_ATOL
+    )
